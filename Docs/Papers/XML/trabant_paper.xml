@@ -1,0 +1,1936 @@
+<?xml version='1.0' encoding='utf-8'?>
+<document source="5f2b024a-3d8e-40a2-92d8-c2eaf0d0d94d.pdf" pages="17">
+  <page number="1">
+    <line>Trabant: A Serverless Architecture for Multi-Tenant</line>
+    <line>Orbital Edge Computing</line>
+    <line>Tobias Pfandzelter</line>
+    <line>Technische Universität Berlin</line>
+    <line>Berlin, Germany</line>
+    <line>tp@3s.tu-berlin.de</line>
+    <line>Nikita Bauer</line>
+    <line>Technische Universität Berlin</line>
+    <line>Berlin, Germany</line>
+    <line>nba@3s.tu-berlin.de</line>
+    <line>Alexander Leis</line>
+    <line>Technische Universität Berlin</line>
+    <line>Berlin, Germany</line>
+    <line>ale@3s.tu-berlin.de</line>
+    <line>Corentin Perdrizet</line>
+    <line>Bordeaux INP</line>
+    <line>ENSEIRB-MATMECA</line>
+    <line>Bordeaux, France</line>
+    <line>corentin.perdrizet@bordeaux-</line>
+    <line>inp.fr</line>
+    <line>Felix Trautwein</line>
+    <line>Technische Universität Berlin</line>
+    <line>Berlin, Germany</line>
+    <line>ftr@3s.tu-berlin.de</line>
+    <line>Trever Schirmer</line>
+    <line>Technische Universität Berlin</line>
+    <line>Berlin, Germany</line>
+    <line>ts@3s.tu-berlin.de</line>
+    <line>Osama Abboud</line>
+    <line>Huawei Technologies</line>
+    <line>Munich, Germany</line>
+    <line>osama.abboud@huawei.com</line>
+    <line>David Bermbach</line>
+    <line>Technische Universität Berlin</line>
+    <line>Berlin, Germany</line>
+    <line>db@3s.tu-berlin.de</line>
+    <line>Abstract</line>
+    <line>Orbital edge computing reduces the data transmission needs</line>
+    <line>of Earth observation satellites by processing sensor data on-</line>
+    <line>board, allowing near-real-time insights while minimizing</line>
+    <line>downlink costs. However, current orbital edge computing ar-</line>
+    <line>chitectures are in!exible, requiring custom mission planning</line>
+    <line>and high upfront development costs. In this paper, we pro-</line>
+    <line>pose a novel approach: shared Earth observation satellites</line>
+    <line>that are operated by a central provider but used by multiple</line>
+    <line>tenants. Each tenant can execute their own logic on-board</line>
+    <line>the satellite to "lter, prioritize, and analyze sensor data.</line>
+    <line>We introduce Trabant, a serverless architecture for shared</line>
+    <line>satellite platforms, leveraging the Function-as-a-Service (FaaS)</line>
+    <line>paradigm and time-shifted computing. This architecture ab-</line>
+    <line>stracts operational complexities, enabling dynamic schedul-</line>
+    <line>ing under satellite resource constraints, reducing deployment</line>
+    <line>overhead, and aligning event-driven satellite observations</line>
+    <line>with intermittent computation. We present the design of</line>
+    <line>Trabant, demonstrate its capabilities with a proof-of-concept</line>
+    <line>prototype, and evaluate it using real satellite computing</line>
+    <line>telemetry data. Our "ndings suggest that Trabant can signi"-</line>
+    <line>cantly reduce mission planning overheads, o#ering a scalable</line>
+    <line>and e$cient platform for diverse Earth observation missions.</line>
+    <line>1</line>
+    <line>Introduction</line>
+    <line>Orbital edge computing (OEC) can reduce the amount of</line>
+    <line>data Earth observation satellites need to downlink by "lter-</line>
+    <line>ing and prioritizing sensor readings on-board the satellite,</line>
+    <line>decreasing cost and energy demand while allowing insights</line>
+    <line>ship/vessel </line>
+    <line>detection</line>
+    <line>tenant 1</line>
+    <line>land cover </line>
+    <line>classification</line>
+    <line>tenant 2</line>
+    <line>wildfire </line>
+    <line>detection</line>
+    <line>tenant 3</line>
+    <line>soil moisture </line>
+    <line>calculation</line>
+    <line>tenant 4</line>
+    <line>frame</line>
+    <line>capture</line>
+    <line>(filtered)</line>
+    <line>downlink queue</line>
+    <line>shared processing</line>
+    <line>Figure 1: A shared satellite with orbital edge comput-</line>
+    <line>ing could continuously capture Earth observation data</line>
+    <line>and process it using services and models from di!er-</line>
+    <line>ent tenants, reducing the downlink strain while still</line>
+    <line>providing near-real-time insights</line>
+    <line>in near-real-time [26, 27, 32, 33, 48, 77, 78, 81, 83]. Current</line>
+    <line>OEC architectures require careful mission planning, align-</line>
+    <line>ing sensor resolution, orbital parameters, energy harvesting</line>
+    <line>equipment, algorithms, and compute capabilities for a spe-</line>
+    <line>ci"c use case, meaning OEC-equipped satellites are in!exible</line>
+    <line>and have high upfront development costs [26, 37, 77].</line>
+    <line>Instead of these vertically integrated, purpose-built satel-</line>
+    <line>lites, we propose shared Earth observation satellites, owned</line>
+    <line>and operated by a satellite operator, but simultaneously used</line>
+    <line>by di#erent tenants to !exibly execute their Earth obser-</line>
+    <line>vation missions. We show a simpli"ed version of this idea</line>
+    <line>in Figure 1. Our shared satellite captures frames using its</line>
+    <line>cameras and sensors, those frames and their metadata are</line>
+    <line>processed on the satellite by di#erent services, which then</line>
+    <line>insert their results into a downlink queue or discard frames</line>
+    <line>that are not of value to them. Essentially, clients can use their</line>
+    <line>own logic on-board the satellite to "lter and prioritize Earth</line>
+    <line>1</line>
+    <line>arXiv:2504.08337v1  [cs.DC]  11 Apr 2025</line>
+  </page>
+  <page number="2">
+    <line>observation data and perform inference tasks in as soon as</line>
+    <line>new data is captured. The key insights that lead us to believe</line>
+    <line>that this is a viable architecture are:</line>
+    <line>(1) That Earth observation satellites are often unused,</line>
+    <line>e.g., a satellite meant to observe wild"res also !ies</line>
+    <line>over the oceans, and that sharing sensing capabilities</line>
+    <line>can reduce overall mission costs.</line>
+    <line>(2) That the mission planning and operating processes</line>
+    <line>between satellite operators and Earth observation</line>
+    <line>clients are not well aligned: While operators need</line>
+    <line>months and thousands of dollars to develop a satellite</line>
+    <line>and then operate it for years to amortize those costs,</line>
+    <line>clients, e.g., scientists, are interested in running new</line>
+    <line>live queries, continuously updating their inference</line>
+    <line>and "ltering logic, or deploying new measurement</line>
+    <line>campaigns, all with as little lead time as possible.</line>
+    <line>(3) That OEC already provides a !exible platform for</line>
+    <line>sharing resources using the same service deployment</line>
+    <line>and management approaches that are used in terres-</line>
+    <line>trial computing today.</line>
+    <line>Emphasizing this last point, we present Trabant, a server-</line>
+    <line>less architecture for shared Earth observation satellite plat-</line>
+    <line>forms with OEC. We believe that following the principles of</line>
+    <line>serverless computing, especially the Function-as-a-Service</line>
+    <line>(FaaS) deployment paradigm, can help overcome the salient</line>
+    <line>challenges of operating shared satellite platforms:</line>
+    <line>• The high level of abstraction in FaaS allows satellite</line>
+    <line>operators to schedule or interrupt OEC service invo-</line>
+    <line>cations under the unique temperature, energy, and</line>
+    <line>resource constraints of an OEC satellite, e.g., allow-</line>
+    <line>ing temporal shifting of computation to times when</line>
+    <line>a satellite can harvest solar energy [65, 67].</line>
+    <line>• This level of abstraction also reduces development</line>
+    <line>costs for clients, who no longer have to manage re-</line>
+    <line>source scheduling or other operational concerns in</line>
+    <line>their OEC services [41, 44].</line>
+    <line>• Shared application runtimes reduce the size of service</line>
+    <line>deployment packages, which helps reduce deploy-</line>
+    <line>ment costs given the high uplink costs for satellites.</line>
+    <line>Instead of uplinking, e.g., a Python runtime per ser-</line>
+    <line>vice (as would be required for containers or virtual</line>
+    <line>machines), deploying a FaaS function requires only</line>
+    <line>its code.</line>
+    <line>• The FaaS execution model, where client code is ex-</line>
+    <line>ecuted in response to events, aligns with the con-</line>
+    <line>tinuous generation of Earth observation events by</line>
+    <line>satellite sensing equipment.</line>
+    <line>We elaborate the opportunities and challenges of shared</line>
+    <line>satellite platforms in §3. We give an overview of the architec-</line>
+    <line>ture of Trabant in §4 and evaluate it with a proof-of-concept</line>
+    <line>prototype in §5. Speci"cally, we use real OEC satellite traces</line>
+    <line>downlink (data)</line>
+    <line>uplink (TT&amp;C)</line>
+    <line>backhaul</line>
+    <line>captured frames</line>
+    <line>ground station</line>
+    <line>(near pole)</line>
+    <line>cloud</line>
+    <line>scientist</line>
+    <line>satellite orbit</line>
+    <line>Figure 2: Traditional Earth observation satellite cap-</line>
+    <line>ture images of Earth from LEO and downlink them</line>
+    <line>when passing ground stations, which are usually lo-</line>
+    <line>cated near the Earth’s poles. Data is sent through the</line>
+    <line>backhaul network to a cloud for processing, from</line>
+    <line>which scientists can access it for analysis</line>
+    <line>and telemetry data to replicate a realistic OEC environment</line>
+    <line>for this evaluation. Finally, we provide an outlook and av-</line>
+    <line>enues for future work in §6. We make all artifacts developed</line>
+    <line>for this paper available as open-source software.1</line>
+    <line>2</line>
+    <line>Background</line>
+    <line>We "rst give an overview of Earth observation satellites,</line>
+    <line>orbital edge computing, and serverless edge computing.</line>
+    <line>2.1</line>
+    <line>Earth Observation Satellites</line>
+    <line>Earth observation satellites collect data on Earth’s land, oceans,</line>
+    <line>or atmosphere, providing a crucial data source for remote</line>
+    <line>sensing applications in climate science, agriculture, "nance,</line>
+    <line>or disaster monitoring. 95 % of the more than 1200 Earth</line>
+    <line>observation satellites orbiting Earth today are located at</line>
+    <line>altitudes below 2000 km, in low-Earth orbit (LEO) [6, 50].</line>
+    <line>This low orbit allows high-resolution data capture, limits the</line>
+    <line>power required to downlink data, and is cheaper to launch</line>
+    <line>into [26]. To maintain orbit, LEO satellites perform a rev-</line>
+    <line>olution around Earth every 1 h to 2 h. Many of the Earth</line>
+    <line>observation satellites active today are small, e.g., following</line>
+    <line>the CubeSat standard with a standardized form factor of</line>
+    <line>a 10 cm cube (1 U) [23], and use commercial-o#-the-shelf</line>
+    <line>(COTS) equipment, keeping development costs as low as</line>
+    <line>$65 000 [2, 18, 22, 27].</line>
+    <line>We show a typical Earth observation satellite architec-</line>
+    <line>ture in Figure 2. The satellite continuously captures frames,</line>
+    <line>1https://github.com/project-spencer/trabant</line>
+    <line>2</line>
+  </page>
+  <page number="3">
+    <line>i.e., images of Earth in di#erent bands (with di#erent cen-</line>
+    <line>tral wavelengths) [26]. Satellites periodically pass ground</line>
+    <line>stations that they can downlink data to [75]. Such ground</line>
+    <line>stations are usually located near the Earth’s poles, as this</line>
+    <line>allows the satellite to perform downlinking once per orbit</line>
+    <line>despite Earth’s rotation. Depending on the satellite’s power</line>
+    <line>constraints and antenna size, total downlink data size for a</line>
+    <line>typical Earth observation satellite can range from hundreds</line>
+    <line>of megabytes to a few gigabytes per pass [28, 75]. In the up-</line>
+    <line>link direction, satellites can receive tracking, telemetry, and</line>
+    <line>control (TT&amp;C) data, e.g., for acknowledgements, although</line>
+    <line>this link is usually narrowband and thus constrained to tens</line>
+    <line>to hundreds of kilobits per second [75, 81].</line>
+    <line>A simple calculation shows that downlink rate is a key bot-</line>
+    <line>tleneck for Earth observation: Consider a satellite capturing</line>
+    <line>images at a 256 px →256 px frame resolution with each pixel</line>
+    <line>representing 10 m →10 m on the ground (a relatively subpar</line>
+    <line>resolution). Within a single orbit, the satellite would collect</line>
+    <line>40 000 km</line>
+    <line>256 px→10 m px↑1 ↓15 628 individual frames. Using only red,</line>
+    <line>green, and blue bands with one byte per pixel, this would</line>
+    <line>yield ↔3.07 GB of raw data to be downlinked per orbit.</line>
+    <line>2.2</line>
+    <line>Orbital Edge Computing</line>
+    <line>Orbital edge computing (OEC) is a new approach to limit</line>
+    <line>the cost of data downlinking through on-board data process-</line>
+    <line>ing [26, 27, 32, 33, 38, 43, 47, 48, 77, 78, 81, 83]. By executing</line>
+    <line>"ltering and inference on the satellite, unneeded data can be</line>
+    <line>discarded, reducing the strain on the downlink. For example,</line>
+    <line>ESA’s ω-SAT-1 [36, 37] mission has demonstrated on-board</line>
+    <line>cloud segmentation using a machine learning (ML) model.</line>
+    <line>Beyond that, information can be extracted directly from the</line>
+    <line>raw data to then downlink only an ML inference result in-</line>
+    <line>stead of a whole frame. Such "ltering and inference not only</line>
+    <line>saves bandwidth, but reduces the time to generate insights</line>
+    <line>from Earth observation data.</line>
+    <line>Unlike satellite !ight controllers, which are critical compo-</line>
+    <line>nents, OEC can use commodity COTS computing hardware,</line>
+    <line>such as Raspberry Pi or NVIDIA Jetson boards [5, 8, 14, 70,</line>
+    <line>81]. The limited radiation in LEO may lead to infrequent</line>
+    <line>hardware crashes as a result of single-event upsets (SEU)</line>
+    <line>but has been shown to not a#ect performance or lifetime</line>
+    <line>for typical missions [58, 81]. The main constraints for such</line>
+    <line>hardware are energy availability and heat dissipation [81].</line>
+    <line>Most Earth observation satellites use a combination of solar</line>
+    <line>panels and batteries [34, 61]. Depending on solar panel area</line>
+    <line>and sunlight, a CubeSat can harvest on the order of 1 W to</line>
+    <line>150 W of energy at maximum [9, 34, 81]. If the satellite is</line>
+    <line>eclipsed by Earth or not ideally positioned for full solar ex-</line>
+    <line>posure, less or no energy can be harvested. During this time,</line>
+    <line>the satellite may use its batteries to drive communication</line>
+    <line>and computation equipment.</line>
+    <line>Given the lack of atmosphere in LEO, satellite on-board</line>
+    <line>computing devices must make use of radiative cooling, which</line>
+    <line>is relatively ine$cient especially for smaller satellites with</line>
+    <line>little surface area [81, 82]. Such passive heat dissipation us-</line>
+    <line>ing the satellite structure must also ensure that the opera-</line>
+    <line>tional temperature limits of the satellite are not exceeded, as</line>
+    <line>this could permanently damage satellite components. Con-</line>
+    <line>sequently, there is a limit on how much heat a computing</line>
+    <line>chip may generate during its operation.</line>
+    <line>2.3</line>
+    <line>Serverless Edge Computing</line>
+    <line>Serverless computing is a popular cloud deployment para-</line>
+    <line>digm that decouples application logic from operational con-</line>
+    <line>cerns such as elastic scaling [41, 44]. Function-as-a-Service</line>
+    <line>(FaaS) is one of the predominant serverless programming</line>
+    <line>models. In FaaS, applications are composed of small, stateless</line>
+    <line>functions that can be invoked in response to events, such</line>
+    <line>as HTTP requests, asynchronous messages, or changes to</line>
+    <line>a database. Developers only write the function code using</line>
+    <line>a high-level programming language, while the underlying</line>
+    <line>platform, which is managed by the cloud provider, handles</line>
+    <line>resource allocation, elastic on-demand function instantiation,</line>
+    <line>and scale-to-zero. This bene"ts not only application devel-</line>
+    <line>opers, who can outsource operational concerns and focus on</line>
+    <line>business logic, but also cloud platform operators, who can</line>
+    <line>allocate their available resources e$ciently and dynamically</line>
+    <line>pool resources between tenants [56].</line>
+    <line>At the edge, where resources are more constrained than</line>
+    <line>in a cloud data center, FaaS can have similar bene"ts [15, 27,</line>
+    <line>62, 69, 80]. Rather than allocating "xed ‘slices’ of infrastruc-</line>
+    <line>ture for a tenant, an edge service provider can dynamically</line>
+    <line>allocate the limited edge resources between functions of</line>
+    <line>di#erent tenants, creating the illusion that each tenant can</line>
+    <line>always use as many resources as they require.</line>
+    <line>3</line>
+    <line>Multi-Tenant Orbital Edge Computing</line>
+    <line>Before introducing the Trabant architecture, we elaborate</line>
+    <line>how we believe existing satellite mission design falls short</line>
+    <line>of the bene"ts that OEC has, and how shared OEC satellites</line>
+    <line>could address these limitations by decoupling the satellite</line>
+    <line>platform from the applications and missions running on it.</line>
+    <line>Mission Cost. An obvious disadvantage of planning a sep-</line>
+    <line>arate satellite mission for each application is cost. Even with</line>
+    <line>COTS equipment, parts costs for a 1U CubeSat can be on the</line>
+    <line>order of $65 000 [2, 26]. Launch costs for commercial ride-</line>
+    <line>share launches can be on the order of $2500/kg [76], but ad-</line>
+    <line>ditional costs for shipping, installation, payload separation,</line>
+    <line>and operation can increase this to $100 000 per mission [54].</line>
+    <line>In addition, planning a satellite mission, building the satellite,</line>
+    <line>and operating it over a multi-year lifetime require signi"cant</line>
+    <line>human resources. These costs are prohibitive for most Earth</line>
+    <line>3</line>
+  </page>
+  <page number="4">
+    <line>observation use-cases, where scientists must instead rely</line>
+    <line>on public commercial Earth imagery providers with lower-</line>
+    <line>resolution data that can be days or weeks old. A shared satel-</line>
+    <line>lite platform could distribute these missions costs between the</line>
+    <line>tenants over the lifetime of the satellite.</line>
+    <line>Mission Lead Times. Along with mission development costs,</line>
+    <line>satellite missions also have long lead times, including manu-</line>
+    <line>facturing the hardware itself, licensing the satellite and com-</line>
+    <line>munication frequencies, and waiting for a suitable launch</line>
+    <line>opportunity. CubeSat missions regularly need 1–2 years from</line>
+    <line>start to the satellite being inserted into orbit [54]. Application</line>
+    <line>requirements regarding sensor resolution, downlink band-</line>
+    <line>width, and compute resources have to be known early in this</line>
+    <line>process. These mission lead times mean that any OEC soft-</line>
+    <line>ware meant to provide valuable insights from orbit is already</line>
+    <line>years old by the time it becomes operational, a signi"cant</line>
+    <line>time span compared to advances in software development.</line>
+    <line>Decoupling OEC software development from satellite develop-</line>
+    <line>ment can reduce lead times for new applications to months or</line>
+    <line>even weeks.</line>
+    <line>Mission/Hardware/Software Alignment. When planning a</line>
+    <line>satellite mission for a speci"c application, mission design</line>
+    <line>has to be carefully balanced to manage costs. As weight is</line>
+    <line>the main factor for launch costs, antenna size, solar panel</line>
+    <line>area, battery capacity, OEC compute equipment, and sensors</line>
+    <line>must be chosen to "t perfectly. For example, harvesting too</line>
+    <line>little solar power impacts the functionality of the satellite,</line>
+    <line>while harvesting too much means that some launch weight</line>
+    <line>was wasted. Similarly, the compute equipment must be able</line>
+    <line>to run the "ltering or inference logic in the time it takes to</line>
+    <line>capture a new frame, i.e., not lead to queuing, yet executing</line>
+    <line>the logic too quickly implies that OEC equipment was over-</line>
+    <line>provisioned. Then, the downlink bandwidth (and antenna</line>
+    <line>size and power budget) must "t the expected data size, i.e.,</line>
+    <line>the frame resolution, frame capture frequency, and expected</line>
+    <line>data minimization through the OEC software. While these</line>
+    <line>constraints can of course be solved with careful mission</line>
+    <line>planning, they signi"cantly constrain the !exibility of the</line>
+    <line>satellite. Updating the mission, e.g., with new "ltering logic</line>
+    <line>that is more accurate but requires more compute resources</line>
+    <line>or leads to more total downlinked data, is not possible. As a</line>
+    <line>result, the data that an Earth observation satellite generates</line>
+    <line>over its lifetime can become less valuable as the mission pro-</line>
+    <line>gresses. Running multiple applications on a shared satellite</line>
+    <line>platform with OEC allows !exible allocation and reallocation</line>
+    <line>of the mission to di"erent applications.</line>
+    <line>Development Cost for Constrained Software. OEC is a unique</line>
+    <line>environment to deploy and manage application services in.</line>
+    <line>OEC software must deal with varying energy availability,</line>
+    <line>using excess solar power when the satellite is in sunlight</line>
+    <line>and not entirely depleting the battery when the satellite</line>
+    <line>is eclipsed. At the same time, the software must refrain</line>
+    <line>from sustained resource utilization, as this could increase</line>
+    <line>equipment temperature beyond operational limits. Finally,</line>
+    <line>while unlikely in LEO, SEU caused by radiation outside the</line>
+    <line>Earth’s atmosphere may lock up the OEC computer, necessi-</line>
+    <line>tating a hard reboot across which the software must maintain</line>
+    <line>functionality. While not impossible to design for, these con-</line>
+    <line>straints are hardly intuitive for those providing the OEC</line>
+    <line>application logic, who are experts in Earth observation or</line>
+    <line>related "elds rather than OEC software developers. Addition-</line>
+    <line>ally, the e#ort to develop software to "t these constraints is</line>
+    <line>repeated for every satellite mission, as there are no existing</line>
+    <line>OEC operating systems to build on top of. A shared satellite</line>
+    <line>OEC environment could provide a software platform tailored</line>
+    <line>to the satellite, abstracting these constraints for the application</line>
+    <line>services running on it.</line>
+    <line>LEO Satellites Spend Little Time Over Their Regions-of-</line>
+    <line>Interest. To maintain their orbit, satellites in LEO must move</line>
+    <line>at speeds in excess of 25 000 km/h, while Earth continuously</line>
+    <line>rotates underneath. Over time, the satellite covers di#erent</line>
+    <line>geographical areas that may not be of interest to its mission.</line>
+    <line>For example, a satellite monitoring wild"res in Australia</line>
+    <line>from 520 km altitude in a typical sun-synchronous orbit (97↗</line>
+    <line>inclination) will spend only 2.5 % of its lifetime over Aus-</line>
+    <line>tralia [25, 49]. Of course this satellite could be designed to</line>
+    <line>wake up and capture frames only over a speci"c geographic</line>
+    <line>area, with power, downlink, and compute resources bud-</line>
+    <line>geted accordingly, although the sensors could also be used</line>
+    <line>for other missions. From a cost perspective, "xed develop-</line>
+    <line>ment and operational costs remain. Serving multiple tenants</line>
+    <line>and applications means that a shared satellite can provide more</line>
+    <line>value as it visits di"erent geographic areas during each orbit.</line>
+    <line>Environmental Impact. Finally, the environmental impacts</line>
+    <line>of having hundreds or thousands of application-speci"c satel-</line>
+    <line>lites in LEO are worth considering. Each satellite launch re-</line>
+    <line>leases considerable amounts of greenhouse gases into the</line>
+    <line>atmosphere and contributes to stratospheric ozone deple-</line>
+    <line>tion [64]. During its mission, the satellite requires a portion</line>
+    <line>of LEO, becoming a collision risk for other satellites [17, 45]</line>
+    <line>and possibly contributing to light pollution [52]. Most LEO</line>
+    <line>satellites deorbit after some time as a result of atmospheric</line>
+    <line>drag, yet burning up in the atmosphere is suspected to neg-</line>
+    <line>atively impact Earth’s ozone layer [31]. Although a shared</line>
+    <line>satellite may be larger than an application-speci#c one, reduc-</line>
+    <line>ing the overall number and mass of satellites in Earth orbit can</line>
+    <line>reduce the environmental impact.</line>
+    <line>4</line>
+  </page>
+  <page number="5">
+    <line>frame </line>
+    <line>buffer</line>
+    <line>preprocess/</line>
+    <line>prefilter</line>
+    <line>func1</line>
+    <line>func2</line>
+    <line>funcn</line>
+    <line>output </line>
+    <line>buffer</line>
+    <line>satellite</line>
+    <line>state</line>
+    <line>downlink</line>
+    <line>executor</line>
+    <line>execution </line>
+    <line>queue</line>
+    <line>Figure 3: Trabant is a serverless architecture for on-</line>
+    <line>board processing of Earth observation frames. Cap-</line>
+    <line>tured frames are preprocessed and pre"ltered, with an</line>
+    <line>executor either directly invoking tenants’ functions</line>
+    <line>or enqueuing them when temperature or power con-</line>
+    <line>straints do not allow processing. The function output,</line>
+    <line>which can be "ltered or inferred data, is then bu!ered</line>
+    <line>for downlinking.</line>
+    <line>4</line>
+    <line>Trabant Approach</line>
+    <line>Trabant is a serverless approach to building a shared OEC</line>
+    <line>satellite software platform. Clients, such as scientists, provide</line>
+    <line>"ltering, inference, and selection logic for the satellite as</line>
+    <line>FaaS functions. The satellite continuously captures multi-</line>
+    <line>spectral frames of Earth at its given sample distance and</line>
+    <line>rate. Trabant takes these frames and executes the clients’</line>
+    <line>logic against them, providing isolation for client code and</line>
+    <line>ensuring that the constraints of the satellite regarding power</line>
+    <line>consumption and temperature are adhered to. At the same</line>
+    <line>time, it decouples the e#ort of managing the complex OEC</line>
+    <line>execution environment from function implementation.</line>
+    <line>We provide an overview of the Trabant components in</line>
+    <line>Figure 3. Captured frames "rst reach the frame bu"er, the</line>
+    <line>interface between the camera/sensor subsystem on the satel-</line>
+    <line>lite and the OEC computer. Raw frame data must be adjusted</line>
+    <line>for optical distortion before it can be used by an application</line>
+    <line>and atmospheric turbulence or cloud cover could obscure</line>
+    <line>the view of Earth. As applications expect accurate data with-</line>
+    <line>out signi"cant cloud cover or distortions [37, 71], Trabant</line>
+    <line>includes a preprocessing/pre#ltering step. This step, which</line>
+    <line>runs on the OEC hardware, already "lters out frames that</line>
+    <line>do not meet a certain quality level. Note that this means that</line>
+    <line>the rate at which applications receive frames for processing</line>
+    <line>may be lower than the actual satellite frame capturing rate.</line>
+    <line>An executor invokes the di#erent applications with the</line>
+    <line>frame and its metadata, such as current time or location.</line>
+    <line>The executor does not necessarily invoke each function in-</line>
+    <line>stantly: Instead, it continuously monitors the state of the</line>
+    <line>satellite, including battery charge levels and temperature.</line>
+    <line>If the available energy is too low or temperature too high,</line>
+    <line>the executor puts invocations (pairs of function and frame</line>
+    <line>references) into a persistent execution queue. Once su$-</line>
+    <line>cient energy is available and the thermal state permits, the</line>
+    <line>queue can be processed. Time-shifting FaaS invocations in</line>
+    <line>this manner is a well-known technique employed, e.g., in</line>
+    <line>Meta’s XFaaS [65, 67].</line>
+    <line>Each tenant application runs as a FaaS function in its own</line>
+    <line>isolated process. An implementation of Trabant may provide</line>
+    <line>di#erent language and library runtimes, e.g., for Python or</line>
+    <line>a speci"c ML library. The results of each invocation are</line>
+    <line>transferred into an output bu#er that can be downlinked</line>
+    <line>once the satellite is in contact with a ground station. These</line>
+    <line>results could be whole frames that an application deems</line>
+    <line>worthy of downlinking, cropped frames with higher value</line>
+    <line>for the client, or just inference results.</line>
+    <line>While speci"c pricing strategies are out of scope for this</line>
+    <line>paper, we envision using the same usage-based pricing strate-</line>
+    <line>gies used in cloud computing today. This incentivizes users</line>
+    <line>to limit their resource usage and allows operators to amor-</line>
+    <line>tize cost. While the speci"c pricing strategies are outside the</line>
+    <line>scope of this paper, we discuss avenues for future works in</line>
+    <line>this "eld in §6.</line>
+    <line>Beyond ensuring that OEC equipment only performs pro-</line>
+    <line>cessing tasks when energy is available and the satellite tem-</line>
+    <line>perature is not close to its operational limits, note that Tra-</line>
+    <line>bant keeps no state other than the persistent execution queue</line>
+    <line>and output bu#er. As a result, there is no signi"cant impact</line>
+    <line>on applications during an unexpected OEC reset, e.g., caused</line>
+    <line>by SEU or when too much energy is required for communi-</line>
+    <line>cation or satellite attitude control. Each independent step,</line>
+    <line>including the application functions, is free of side e#ects and</line>
+    <line>can thus be repeated if necessary. Note that this still assumes</line>
+    <line>that the actual hard drive, e.g., !ash storage, is su$ciently</line>
+    <line>resilient to SEU, which is an orthogonal challenge that is</line>
+    <line>also present without Trabant [24, 42].</line>
+    <line>Of course, simply o#ering the satellite OEC resources as</line>
+    <line>a platform for tenants does not mean that there are no en-</line>
+    <line>ergy, thermal, computational, or downlink constraints for</line>
+    <line>the entire OEC software system. These constraints still limit</line>
+    <line>the overall computational capabilities of the satellite and</line>
+    <line>allocating more client services than the satellite can handle</line>
+    <line>will inevitably lead to backpressure. We believe that the FaaS</line>
+    <line>model signi"cantly simpli"es reasoning about the resource</line>
+    <line>consumption of the services running on the shared satellite.</line>
+    <line>Speci"cally, we argue for modelling the energy consump-</line>
+    <line>tion of each function independently by executing it with a</line>
+    <line>su$ciently large (realistic) set of input frames on compute</line>
+    <line>hardware identical to that of the OEC satellite and measur-</line>
+    <line>ing the average energy required for each invocation. The</line>
+    <line>high level of abstraction that the function is programmed</line>
+    <line>for makes this trivial. Further, this should also give insight</line>
+    <line>to the compression ratio of the service, i.e., the number of</line>
+    <line>bytes it outputs for downlinking compared to the number</line>
+    <line>5</line>
+  </page>
+  <page number="6">
+    <line>of input bytes (frame count and size). These two variables</line>
+    <line>must be considered for each function addition or replace-</line>
+    <line>ment. Along with some constants speci"c to the satellite</line>
+    <line>(which can be quanti"ed during satellite development), the</line>
+    <line>following constraint must hold when considering a change</line>
+    <line>to the functions 𝐿1, 𝐿2, . . . , 𝐿𝐿on the OEC satellite:</line>
+    <line>𝑀generated ↘𝑀compute + 𝑀comm</line>
+    <line>(1)</line>
+    <line>, i.e., the power harvested for compute and communication</line>
+    <line>must be greater than that spent, where:</line>
+    <line>𝑀compute = 𝑀base +𝑁pre →𝑂frame +</line>
+    <line>𝐿</line>
+    <line>!</line>
+    <line>𝑀=1</line>
+    <line>𝑁𝑁𝐿→𝑂frame →(1 ↑𝑂"lter)</line>
+    <line>(2)</line>
+    <line>Here, 𝑁base is the base power draw of the OEC equipment</line>
+    <line>and Trabant, 𝑁pre is the energy required to preprocess a</line>
+    <line>frame, 𝑂frame is the frame capture rate, 𝑂"lter is the rate at</line>
+    <line>which frames are discarded by the preprocessing step, and</line>
+    <line>𝑁𝑁𝐿is the energy required to execute one invocation of 𝐿𝑀.</line>
+    <line>Note that this assumes power consumption to grow linearly</line>
+    <line>with compute utilization. This is a simplifying assumption</line>
+    <line>but serves as a starting point and are su$cient to investigate</line>
+    <line>the Trabant approach.</line>
+    <line>Communication power budget can be calculated as:</line>
+    <line>𝑀comm = 𝑁sendbyte →</line>
+    <line>𝐿</line>
+    <line>!</line>
+    <line>𝑀=1</line>
+    <line>𝑃𝑁𝐿→𝑂frame →(1 ↑𝑂"lter) →𝑄frame (3)</line>
+    <line>Here, 𝑁sendbyte is the energy required to downlink a single</line>
+    <line>byte, 𝑃𝑁𝐿is the compression ratio of 𝐿𝑀, and 𝑄frame is the size</line>
+    <line>of a frame in bytes.</line>
+    <line>Next to energy budget, we must also ensure that the down-</line>
+    <line>link budget is not exceeded:</line>
+    <line>𝑅downlink ↘</line>
+    <line>𝐿</line>
+    <line>!</line>
+    <line>𝑀=1</line>
+    <line>𝑃𝑁𝐿→𝑂frame →(1 ↑𝑂"lter) →𝑄frame</line>
+    <line>(4)</line>
+    <line>, where 𝑅downlink is the budget for data that can be queued</line>
+    <line>for downlinking, which can be calculated by dividing data</line>
+    <line>rate during ground station contact by contact rate.</line>
+    <line>Finally, we must ensure that frames can be processed as</line>
+    <line>quickly as they are captured. Speci"cally, it must hold:</line>
+    <line>𝑂frame↑1 ↘𝑆pre +</line>
+    <line>𝐿</line>
+    <line>!</line>
+    <line>𝑀=1</line>
+    <line>𝑆𝑁𝐿→(1 ↑𝑂"lter)</line>
+    <line>(5)</line>
+    <line>, where 𝑆pre is the time taken to preprocess a frame and</line>
+    <line>𝑆𝑁𝐿is the time taken to process one frame with 𝐿𝑀. Note that</line>
+    <line>this ignores possible bene"ts from parallelization of process-</line>
+    <line>ing on multicore architectures and thus serves as an upper</line>
+    <line>bound.</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>Figure 4: During our 6-hour trace, BUPT-1 consumes</line>
+    <line>a mean 13.51 W of power, while its solar array gener-</line>
+    <line>ates between 0.00 W (darkness) and 48.59 W (maximum</line>
+    <line>at sunlight) of power. Power output is also unstable</line>
+    <line>during sunlit periods, with more power generated at</line>
+    <line>the beginning than at the end, a result of the satellite’s</line>
+    <line>angle relative to the sun.</line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line>	</line>
+    <line>Figure 5: Our 6-hour trace from May 1st, 2023, encom-</line>
+    <line>passes four orbits, with the satellite coming into con-</line>
+    <line>tact with the ground station in Tongchuan toward the</line>
+    <line>end of its third orbit</line>
+    <line>5</line>
+    <line>Evaluation</line>
+    <line>To evaluate Trabant empirically, we replicate an OEC satel-</line>
+    <line>lite in a local testbed, deploy a prototype implementation</line>
+    <line>of Trabant on this testbed, and use satellite traces and ML</line>
+    <line>workloads on this system.</line>
+    <line>5.1</line>
+    <line>Evaluation Environment</line>
+    <line>5.1.1</line>
+    <line>Scenario. We base our evaluation on architecture and</line>
+    <line>traces of the BUPT-1 satellite [81]. BUPT-1 is a 12U Cube-</line>
+    <line>Sat research satellite hosting a Raspberry Pi 4B compute</line>
+    <line>board for general-purpose computation. Traces for BUPT-1</line>
+    <line>include generated solar power over time, energy spent on</line>
+    <line>satellite operations, communication and computation, and</line>
+    <line>temperature measurements, all at one-second granularity.</line>
+    <line>BUPT-1 orbits Earth at altitudes between 487 km and 494 km</line>
+    <line>with an inclination of 97.3↗. BUPT-1 can harvest up to 40 W</line>
+    <line>of solar power from two solar arrays and has rechargeable</line>
+    <line>6</line>
+  </page>
+  <page number="7">
+    <line>Raspberry </line>
+    <line>Pi 4B</line>
+    <line>monitoring </line>
+    <line>computer</line>
+    <line>energy </line>
+    <line>monitor</line>
+    <line>temperature </line>
+    <line>monitor</line>
+    <line>5V power </line>
+    <line>supply</line>
+    <line>frames</line>
+    <line>power</line>
+    <line>use</line>
+    <line>chip</line>
+    <line>temp.</line>
+    <line>BUPT-1 solar </line>
+    <line>energy traces</line>
+    <line>Sentinel-2 </line>
+    <line>satellite </line>
+    <line>imagery</line>
+    <line>battery/temp.</line>
+    <line>status</line>
+    <line>Figure 6: The local testbed architecture we use to eval-</line>
+    <line>uate Trabant contains a Raspberry Pi 4B hosting our</line>
+    <line>Trabant prototype and workloads. A monitoring com-</line>
+    <line>puter reads energy and temperature of the Raspberry</line>
+    <line>Pi, models battery levels, and sends input frames.</line>
+    <line>lithium batteries to store energy. The batteries have a total</line>
+    <line>capacity of 115 W h but must not be discharged further than</line>
+    <line>30 %, which would shorten their lifetime. As the batteries</line>
+    <line>are overprovisioned and designed to power four computers</line>
+    <line>instead of just a single Raspberry Pi, we use a more con-</line>
+    <line>strained 57.5 W h battery capacity in our experiments (one</line>
+    <line>fourth of the original capacity). To communicate with the</line>
+    <line>satellite, a ground station in Tongchuan, China is available</line>
+    <line>with a 1 Mbps uplink and 100 Mbps downlink. We assume</line>
+    <line>a 20 % protocol and error-correction overhead for each of</line>
+    <line>these links. We use energy and trajectory traces of BUPT-1</line>
+    <line>for a 6-hour period on May 1st, 2023. We show the generated</line>
+    <line>and consumed (by the satellite) power of our 6-hour section</line>
+    <line>of the trace in Figure 4 and the satellite trajectory in Figure 5.</line>
+    <line>We base our evaluation on BUPT-1 as it is the only satel-</line>
+    <line>lite equipped with COTS computing equipment that has</line>
+    <line>detailed traces openly available with hardware that can be</line>
+    <line>realistically replicated in a lab environment. Of course, there</line>
+    <line>are more powerful Earth observation satellites in terms of</line>
+    <line>energy harvesting e$ciency, compute resources, downlink</line>
+    <line>bandwidth, or ground station pass frequency. Nevertheless,</line>
+    <line>as we discuss in §6, increasing any of these parameters does</line>
+    <line>not obviate the need to adhere to any constraints when sched-</line>
+    <line>uling compute services on an Earth observation satellite, it</line>
+    <line>simply changes them.</line>
+    <line>5.1.2</line>
+    <line>Testbed. For our evaluation, we replicate the BUPT-1</line>
+    <line>environment in a local testbed. As shown in Figure 6, we</line>
+    <line>use a Raspberry Pi 4B as our compute module. A monitor-</line>
+    <line>ing computer connected to this Raspberry Pi over Ethernet</line>
+    <line>emulates the satellite environment by monitoring its chip</line>
+    <line>temperature and overall energy consumption. Using traces</line>
+    <line>from BUPT-1 solar energy harvesting with one-second gran-</line>
+    <line>ularity and measured energy consumption, we model the</line>
+    <line>battery charge levels over time. This information, along with</line>
+    <line>		</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(a) Ocean</line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(b) Land</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(c) Cloud</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line>(d) Darkness</line>
+    <line>Figure 7: Example frames of our workload, each cover-</line>
+    <line>ing 2560 m→2560 m at 10 m/px. Sunlit frames (Figures 7a</line>
+    <line>to 7c) are from Sentinel-2 satellites [3, 29], dark frames</line>
+    <line>are from VIIRS imagery [7, 21].</line>
+    <line>the current external chip temperature, is provided to our</line>
+    <line>Trabant prototype over an HTTP API (in lieu of a real satel-</line>
+    <line>lite interface that would provide this information). Note that</line>
+    <line>in their evaluation of the BUPT-1 satellite, Xing et al. [81]</line>
+    <line>have shown that a ground-based replica of the on-board Rasp-</line>
+    <line>berry Pi 4B has similar energy and temperature performance,</line>
+    <line>leading us to believe that our ground-based experiments are</line>
+    <line>representative of performance in LEO.</line>
+    <line>5.1.3</line>
+    <line>Prototype. Our proof-of-concept prototype of Trabant</line>
+    <line>and our monitoring are implemented in Go, loosely based on</line>
+    <line>the tinyFaaS edge serverless platform [57]. Frames are sent to</line>
+    <line>our prototype as binary data over HTTP, where frames that</line>
+    <line>are not sunlit are "ltered out. Next, our frames are prepro-</line>
+    <line>cessed with an implementation of the Braaten-Cohen-Yang</line>
+    <line>pixel-level cloud detection algorithm [19], providing an esti-</line>
+    <line>mate of frame cloud cover. Frames with a cloud cover larger</line>
+    <line>than 30 % are not processed further, others are enqueued for</line>
+    <line>processing by our functions. Our executor dequeues func-</line>
+    <line>tion calls if it is idle, meaning the battery is not discharged</line>
+    <line>more than 30 % and the external chip temperature is below</line>
+    <line>50 ↗C. We use this low temperature limit to approximate the</line>
+    <line>di$culty of heat dissipation in space. Each function handler</line>
+    <line>is a Docker container using a Python3 runtime and exposing</line>
+    <line>an HTTP endpoint for invocations. Our Python3 runtime has</line>
+    <line>common ML dependencies such as the TensorFlow Lite run-</line>
+    <line>time pre-installed. For every frame, each function receives</line>
+    <line>frame metadata, such as latitude, longitude, and cloud cover,</line>
+    <line>and a path to the frame data on a shared logical volume.</line>
+    <line>The function handler then ensures that any returned data is</line>
+    <line>persisted as output data for downlinking. We emulate down-</line>
+    <line>linking by reading from the output bu#er at the downlink</line>
+    <line>rate when the satellite is in contact with the ground station,</line>
+    <line>modelling antenna power consumption accordingly.</line>
+    <line>5.1.4</line>
+    <line>Workload. Our monitoring computer provides a con-</line>
+    <line>stant stream of “captured frames” as an input workload. This</line>
+    <line>7</line>
+  </page>
+  <page number="8">
+    <line>Table 1: Input Parameters for Our Scenario and Proto-</line>
+    <line>type</line>
+    <line>Variable</line>
+    <line>Value</line>
+    <line>Source</line>
+    <line>𝑀generated</line>
+    <line>2950</line>
+    <line>mW</line>
+    <line>Satellite Trace</line>
+    <line>𝑀base</line>
+    <line>1518</line>
+    <line>mW</line>
+    <line>Measured</line>
+    <line>𝑁sendbyte</line>
+    <line>2</line>
+    <line>µJ/B</line>
+    <line>Satellite Info</line>
+    <line>𝑁pre</line>
+    <line>0.01</line>
+    <line>J</line>
+    <line>Measured</line>
+    <line>𝑂frame</line>
+    <line>2.5</line>
+    <line>Hz</line>
+    <line>Satellite Trace</line>
+    <line>𝑂"lter</line>
+    <line>77.0</line>
+    <line>%</line>
+    <line>Frame Trace</line>
+    <line>𝑄frame</line>
+    <line>256 →256 →13</line>
+    <line>B</line>
+    <line>Frame Trace</line>
+    <line>𝑅downlink</line>
+    <line>600</line>
+    <line>kbps</line>
+    <line>Satellite Trace</line>
+    <line>𝑆pre</line>
+    <line>0.038</line>
+    <line>s</line>
+    <line>Measured</line>
+    <line>trace is based on Sentinel-2 [3, 29] and Visible Infrared Imag-</line>
+    <line>ing Radiometer Suite (VIIRS) [7, 21] satellite imagery with</line>
+    <line>the 13 Sentinel-2 bands. At a ground resolution of 10 m/px</line>
+    <line>and frame size of 256 px →256 px, the satellite would cap-</line>
+    <line>ture a new frame every 400 ms. For each of those frame</line>
+    <line>areas, we "rst calculate if the image would be in darkness</line>
+    <line>or sunlight. For dark images (59.2 %), we use night data cap-</line>
+    <line>tured by the VIIRS instrument. For sunlit frames (40.8 %), we</line>
+    <line>download the most recent image of the frame location before</line>
+    <line>May 1st, 2023, or use a random ocean frame (Sentinel-2 does</line>
+    <line>not provide acquisitions of most of the world’s ocean area).</line>
+    <line>We show example frames in Figure 7. Preliminary analysis</line>
+    <line>of our collected sunlit frames with the s2cloudless [16] ML</line>
+    <line>cloud detector shows a total cloud fraction of 36.3 %, which</line>
+    <line>is smaller than expected in reality (mean ↔67 % world cloud</line>
+    <line>cover [46]), but ensures that our workload size is not favored</line>
+    <line>towards our experiments. In total, 44.4 % of our frames have</line>
+    <line>a cloud cover larger than 30 %.</line>
+    <line>5.1.5</line>
+    <line>Functions. We use "ve ML functions as our on-board</line>
+    <line>workloads, each implemented using Python and TensorFlow.</line>
+    <line>Each model performs ML inference on single satellite frames</line>
+    <line>using the TensorFlow Lite runtime. Note that while all ML</line>
+    <line>models we use are trained on real data and able to perform</line>
+    <line>their respective tasks with acceptable accuracy, the goal of</line>
+    <line>our functions is to present a realistic workload rather than</line>
+    <line>the best possible model performance. As such, our models</line>
+    <line>are also designed to have small footprints (model weights on</line>
+    <line>the order of 0.5 MB to 2 MB) in order to run on constrained</line>
+    <line>hardware.</line>
+    <line>Methane leak preprocessing. The goal of the methane func-</line>
+    <line>tion is to classify satellite images to "lter out those that do</line>
+    <line>not show industrial areas. The classi"cation is performed by</line>
+    <line>a convolutional neural network (CNN) trained on the Eu-</line>
+    <line>roSat [40] dataset and based on the RGB bands of the image.</line>
+    <line>If an image has been classi"ed as showing an industrial area,</line>
+    <line>the RGB bands along with two short wave infrared bands</line>
+    <line>(helpful for identifying methane leaks [74]) are stored for</line>
+    <line>downlinking.</line>
+    <line>Soil moisture preprocessing. The moisture function selects</line>
+    <line>images that are predicted to show di#erent agricultural areas,</line>
+    <line>such as vineyards, based on a CNN trained on the BigEarth-</line>
+    <line>Net [73] dataset. This CNN uses twelve input bands to per-</line>
+    <line>form multilabel classi"cation, i.e., an image can show more</line>
+    <line>than one of the classes. If the frame is relevant, the RGB</line>
+    <line>bands along with two visible and near infrared bands and</line>
+    <line>one short wave infrared band are stored for downlinking, as</line>
+    <line>these bands can be used to infer soil moisture in subsequent</line>
+    <line>processing [39].</line>
+    <line>Segmentation in China. The segment function only pro-</line>
+    <line>cesses frames that show China based on a simple latitude/-</line>
+    <line>longitude bounding box. If a frame falls within the bounding</line>
+    <line>box, the function uses a CNN model based on the U-Net archi-</line>
+    <line>tecture [63] to perform pixel-level segmentation, identifying</line>
+    <line>features such as buildings or roads. The model is trained</line>
+    <line>on a dataset of segmented satellite images of Dubai [1]. For</line>
+    <line>every processed frame, the function stores the RGB bands</line>
+    <line>and pixel mask for downlinking.</line>
+    <line>Vessel recognition. The vessel function contains a CNN</line>
+    <line>model trained on the MASATI [13, 66] dataset and predicts</line>
+    <line>whether a processed frame contains a boat or not. Before</line>
+    <line>performing inference, the function "lters out frames that</line>
+    <line>have a cloud cover larger than 10 %, which could lead to</line>
+    <line>inaccurate inference results. If the model decides that the</line>
+    <line>frame may contain a boat with more than 80 % probability,</line>
+    <line>the RGB bands of the frame are saved for downlinking.</line>
+    <line>Wild#re risk detection. The wildfire function uses a CNN</line>
+    <line>model trained on the Wild#re Prediction Dataset [11] to iden-</line>
+    <line>tify whether the area in a frame is susceptible to wild"res</line>
+    <line>or not. If the probability for a frame is higher than 60 %,</line>
+    <line>all bands of the image are stored for downlinking, enabling</line>
+    <line>further analysis on the ground.</line>
+    <line>5.2</line>
+    <line>Analysis</line>
+    <line>Before deploying our prototype and workload on our testbed,</line>
+    <line>we explore if and when the constraints proposed in §4 hold</line>
+    <line>for our workload. Table 1 shows the variables of our partic-</line>
+    <line>ular satellite environment and implementation, calculated</line>
+    <line>from the satellite and image traces or measured in our pro-</line>
+    <line>totype. In the full BUPT-1 energy monitoring trace, there is</line>
+    <line>a mean 2950 mW available power, the di#erence between</line>
+    <line>a mean 15.59 W solar power and 12.64 W power draw for</line>
+    <line>satellite upkeep (without payload or data transfer).</line>
+    <line>Further, from a 80 Mbps downlink rate and 20 W antenna</line>
+    <line>power, we arrive at 2 µJ/B energy required to downlink one</line>
+    <line>8</line>
+  </page>
+  <page number="9">
+    <line>Table 2: Measured Parameters for Our Workload Functions Across Three Repetitions (Experiments Use Values of</line>
+    <line>Repeat 2)</line>
+    <line>𝑁𝑁</line>
+    <line>𝑆𝑁</line>
+    <line>𝑃𝑁</line>
+    <line>Function</line>
+    <line>1</line>
+    <line>2</line>
+    <line>3</line>
+    <line>1</line>
+    <line>2</line>
+    <line>3</line>
+    <line>1</line>
+    <line>2</line>
+    <line>3</line>
+    <line>methane</line>
+    <line>0.038 J</line>
+    <line>0.041 J</line>
+    <line>0.036 J</line>
+    <line>0.019 s</line>
+    <line>0.018 s</line>
+    <line>0.018 s</line>
+    <line>0.049</line>
+    <line>0.051</line>
+    <line>0.045</line>
+    <line>moisture</line>
+    <line>0.107 J</line>
+    <line>0.092 J</line>
+    <line>0.092 J</line>
+    <line>0.050 s</line>
+    <line>0.050 s</line>
+    <line>0.049 s</line>
+    <line>0.029</line>
+    <line>0.041</line>
+    <line>0.018</line>
+    <line>segment</line>
+    <line>0.663 J</line>
+    <line>0.755 J</line>
+    <line>0.826 J</line>
+    <line>0.429 s</line>
+    <line>0.494 s</line>
+    <line>0.528 s</line>
+    <line>0.043</line>
+    <line>0.047</line>
+    <line>0.051</line>
+    <line>vessel</line>
+    <line>1.075 J</line>
+    <line>1.053 J</line>
+    <line>1.017 J</line>
+    <line>0.562 s</line>
+    <line>0.585 s</line>
+    <line>0.566 s</line>
+    <line>0.024</line>
+    <line>0.026</line>
+    <line>0.021</line>
+    <line>wildfire</line>
+    <line>0.709 J</line>
+    <line>0.667 J</line>
+    <line>0.719 J</line>
+    <line>0.356 s</line>
+    <line>0.353 s</line>
+    <line>0.356 s</line>
+    <line>0.011</line>
+    <line>0.026</line>
+    <line>0.022</line>
+    <line>no-op</line>
+    <line>0.007 J</line>
+    <line>0.007 J</line>
+    <line>0.010 J</line>
+    <line>0.004 s</line>
+    <line>0.004 s</line>
+    <line>0.005 s</line>
+    <line>0.000</line>
+    <line>0.000</line>
+    <line>0.000</line>
+    <line>byte. From the satellite’s trajectory over time, we gather that</line>
+    <line>it is in contact with its ground station for only 0.75 % of</line>
+    <line>its time in orbit, making the downlink budget 𝑅downlink =</line>
+    <line>600 kbps. The mean "lter rate 𝑂"lter is a result of the 40.8 %</line>
+    <line>sunlit frames of which 44.4 % have an estimated cloud cover</line>
+    <line>of less than 30 %. We measure 𝑀base, 𝑁pre, and 𝑆pre on our</line>
+    <line>testbed using a no-op function and our energy monitor.</line>
+    <line>We use a similar approach to quantify function parameters</line>
+    <line>shown in Table 2. On our testbed, we deploy each function</line>
+    <line>in isolation and send 500 randomly selected frames (only</line>
+    <line>sunlit frames with cloud cover lower than 30 %) at a reduced</line>
+    <line>rate (every 2 s), measuring energy required to process each</line>
+    <line>frame (measured power for the duration of the call minus</line>
+    <line>the base power consumption), time to process each call, and</line>
+    <line>compression ratio of each function (output data size divided</line>
+    <line>by input data size). For reference, we also include data on a</line>
+    <line>no-op function. Note that this approach does not require any</line>
+    <line>knowledge about the inner workings of a function: As we</line>
+    <line>only measure the mean time or energy use across many indi-</line>
+    <line>vidual calls, skewed distributions in execution behavior can</line>
+    <line>be accounted for. For example, despite the segment function</line>
+    <line>ignoring frames outside of China (completion within 4 ms)</line>
+    <line>and executing complex inference for the rest (completion</line>
+    <line>time within ↔3 s), we receive a stable mean result across</line>
+    <line>three independent repetitions of the measurement. We use</line>
+    <line>the results of the second repetition of each measurement for</line>
+    <line>the remainder of this experiment.</line>
+    <line>Based on the constraints we set in §4, we can now calculate</line>
+    <line>which functions we may deploy as our workload. We "nd</line>
+    <line>that both our power budget 𝑀compute = 3.02 W &gt; 𝑀generated</line>
+    <line>and downlink budget 746.01 kbps &gt; 𝑅downlink are exceeded</line>
+    <line>when considering deploying all "ve functions. We select</line>
+    <line>the methane, moisture, vessel, and wildfire functions,</line>
+    <line>which have a 𝑀compute = 2.59 W, 𝑀comm = 0.14 W, and total</line>
+    <line>processing time of 0.266 s &lt; 𝑂↑1</line>
+    <line>frame = 0.4 s, and downlink</line>
+    <line>564.34 kbps.</line>
+    <line>5.3</line>
+    <line>End-to-End Demonstration</line>
+    <line>We "rst take a high-level look at the performance of the</line>
+    <line>Trabant approach using an end-to-end demonstration of our</line>
+    <line>prototype with the full 6-hour satellite trace. We use the</line>
+    <line>methane, moisture, vessel, and wildfire functions and</line>
+    <line>start with 60 % battery capacity and an empty queue.</line>
+    <line>We show the results of this experiment in Figure 8. Fig-</line>
+    <line>ure 8a shows the power generation and consumption of our</line>
+    <line>satellite, communication, and computation. We observe that</line>
+    <line>computing is mostly performed during periods of net pos-</line>
+    <line>itive satellite power, as those are sunlit periods that yield</line>
+    <line>both high solar panel output and sunlit frames for process-</line>
+    <line>ing. The satellite comes into contact with its ground station</line>
+    <line>15 189 s into the experiment, when it starts downlinking data</line>
+    <line>for 270 s, with communication power increasing to 20 W ac-</line>
+    <line>cordingly. The battery level shown in Figure 8c are mostly</line>
+    <line>a#ected by satellite power, although we see a small dip when</line>
+    <line>communication starts. As there is little solar power during</line>
+    <line>the last sunlit period in our trace, the battery charge drops</line>
+    <line>below 70 % towards the end of our experiment. We see this</line>
+    <line>re!ected in queue size and processing periods in Figure 8b,</line>
+    <line>where Trabant stops processing new frames (instead queuing</line>
+    <line>them for later), despite a positive power output of the solar</line>
+    <line>panels. Here, we also see the impact of external chip tem-</line>
+    <line>perature, as shown in Figure 8d. Temperature increases as</line>
+    <line>Trabant starts processing function calls for incoming frames.</line>
+    <line>Although there is su$cient energy available for the majority</line>
+    <line>of our experiment, Trabant dequeues function calls only un-</line>
+    <line>til the chip temperature limit of 50 ↗C is reached. Processing</line>
+    <line>these calls increases chip temperature further to a maxi-</line>
+    <line>mum 51.5 ↗C, yet Trabant waits until the compute device has</line>
+    <line>cooled enough to dequeue more invocations.</line>
+    <line>5.4</line>
+    <line>Exceeding Constraints</line>
+    <line>To further explore how Trabant, we perform additional exper-</line>
+    <line>iments using a subset of our trace starting at 4000 s, shortly</line>
+    <line>before the start of the "rst full sunlit period. We compare</line>
+    <line>the same setup (‘default’) as in the full experiment with two</line>
+    <line>9</line>
+  </page>
+  <page number="10">
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(a) Generated and consumed power</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(b) Queue size and processing periods</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(c) Battery levels</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(d) Chip temperature readings</line>
+    <line>Figure 8: Results of the 6-hour experiment show how Trabant time-shifts frame processing under energy and</line>
+    <line>temperature constraints</line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>(a) Queue size and processing periods</line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>! </line>
+    <line></line>
+    <line> </line>
+    <line></line>
+    <line></line>
+    <line>(b) Battery level</line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>!</line>
+    <line></line>
+    <line> </line>
+    <line></line>
+    <line></line>
+    <line>(c) Chip temperature readings</line>
+    <line>Figure 9: Results for a 4000 s experiment with additional comparison con"gurations. ‘overload’ adds the segment</line>
+    <line>function, while ‘no check’ disables the temperature and battery level checks.</line>
+    <line>additional con"gurations: In the ‘overload’ con"guration we</line>
+    <line>add the segment function to our workload. In the ‘no-check’</line>
+    <line>con"guration, we disable compute time-shifting by remov-</line>
+    <line>ing the temperature and battery level checks. Further, we</line>
+    <line>start the experiment with only 60 % battery charge to better</line>
+    <line>observe the impact of di#erent con"gurations.</line>
+    <line>Removing the battery level and temperature checks has</line>
+    <line>signi"cant impact on those values, as shown in Figure 9. Al-</line>
+    <line>though the battery levels are mostly in!uenced by satellite</line>
+    <line>power, recovering from the low battery charge takes 10 %</line>
+    <line>longer without state checking, as the system immediately</line>
+    <line>starts processing frames rather than waiting for available</line>
+    <line>power. This is also re!ected in chip temperature, which</line>
+    <line>grows beyond the 50 ↗C limit. On this small experiment</line>
+    <line>10</line>
+  </page>
+  <page number="11">
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>Figure 10: Trabant seamlessly resumes processing after</line>
+    <line>a hard reset, e.g., after an interrupt through SEU</line>
+    <line>timescale, adding the segment function mainly impacts queue</line>
+    <line>size, with little impact on chip temperature.</line>
+    <line>5.5</line>
+    <line>SEU Resilience</line>
+    <line>Using COTS hardware for satellite computing increases the</line>
+    <line>risk of single-event upsets (SEU) locking up the compute</line>
+    <line>equipment during operation, requiring a hard reset. In Tra-</line>
+    <line>bant, the FaaS paradigm makes SEU resilience particularly</line>
+    <line>straightforward: as the functions itself are stateless, we sim-</line>
+    <line>ply persist the input invocation queue to "nd out which</line>
+    <line>software has processed which frames. To evaluate SEU re-</line>
+    <line>silience of our Trabant prototype, we run a subset of our</line>
+    <line>experiment and unplug the Raspberry Pi 4 power cable a</line>
+    <line>few minutes into the experiment, essentially hard resetting</line>
+    <line>the device without signalling the operating system. We then</line>
+    <line>plug the cable back in to resume operation.</line>
+    <line>The compute power draw and queue length observations</line>
+    <line>shown in Figure 10 show how Trabant dequeues some func-</line>
+    <line>tion invocations shortly before our interrupt (normal oper-</line>
+    <line>ation), with power draw increasing accordingly. When we</line>
+    <line>cause the interrupt at 2100 s, power draw drops to 0 W. As</line>
+    <line>soon as we plug the power cable back in, the device boots</line>
+    <line>and resumes its invocation queue.</line>
+    <line>5.6</line>
+    <line>Deployment Size</line>
+    <line>In terms of communication, Earth observation satellites are</line>
+    <line>optimized for downlinking data rather than uplinking new</line>
+    <line>commands, which occurs infrequently. BUPT-1 has a 1 Mbps</line>
+    <line>uplink, which leads to a theoretical maximum upload size of</line>
+    <line>75 MB per day, assuming a perfect 10 min contact window</line>
+    <line>each day. In reality, this uplink requires error correction</line>
+    <line>and is shared with critical data such as satellite commands.</line>
+    <line>For a shared satellite platform, deployment sizes for tenant</line>
+    <line>software are thus limited.</line>
+    <line>Figure 11 shows the deployment size of the moisture</line>
+    <line>function in Trabant and as a traditional container image.</line>
+    <line>The model used in the moisture function is the largest of</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>	</line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line></line>
+    <line>Figure 11: Deployment sizes for the moisture model</line>
+    <line>and code as Docker containers with ‘slim’ and Alpine</line>
+    <line>Linux base images and in Trabant</line>
+    <line>all of our models at 2.77 MB, but this size is dwarfed by</line>
+    <line>the size of the required base images and dependencies. The</line>
+    <line>o$cial “slim” Python3 base image from Docker Hub has a</line>
+    <line>size of 155.47 MB, while dependencies for model inference</line>
+    <line>are an additional 119 MB. A custom image based on Alpine</line>
+    <line>Linux (which requires manually compiling dependencies</line>
+    <line>such as TensorFlow Lite) has a total size of 121.57 MB. After</line>
+    <line>compression, the slim and Alpine images are 100.47 MB and</line>
+    <line>39.42 MB large, respectively.</line>
+    <line>Trabant also requires a base runtime to exist on the satel-</line>
+    <line>lite, yet runtime "les are identical across tenant functions,</line>
+    <line>allowing us to reduce deployment sizes considerably. De-</line>
+    <line>spite this, Trabant also allows adding custom dependencies,</line>
+    <line>such as a speci"c Python library, to deployment packages.</line>
+    <line>Of course, a similar e#ect could be achieved by coordinating</line>
+    <line>a shared base image among tenants, which would only need</line>
+    <line>to be uploaded once, yet this would increase complexity for</line>
+    <line>service developers.</line>
+    <line>6</line>
+    <line>Discussion &amp; Future Work</line>
+    <line>Our evaluation of the Trabant approach has shown that a</line>
+    <line>serverless architecture is well-suited for shared OEC satel-</line>
+    <line>lites. We now discuss limitations of our work and derive</line>
+    <line>avenues for future work.</line>
+    <line>Earth Observation Satellite Constraints. Our evaluation of</line>
+    <line>Trabant is based on traces of the BUPT-1 satellite. We chose</line>
+    <line>this evaluation scenario as it can be realistically replicated in</line>
+    <line>a lab based on COTS hardware and available "nely-grained,</line>
+    <line>comprehensive traces of satellite trajectory and power con-</line>
+    <line>sumption. Of course, BUPT-1 is primarily a research satellite</line>
+    <line>and can thus not compete with state-of-the-art deployed</line>
+    <line>LEO satellites in terms of Earth observation performance.</line>
+    <line>For example, Planet’s High Speed Downlink 2 [28] achieves</line>
+    <line>a 16.25→higher downlink rate than we assume for BUPT-</line>
+    <line>1 (1.3 Gbps compared to 80 Mbps) while performing more</line>
+    <line>frequent passes over ground stations further North than</line>
+    <line>11</line>
+  </page>
+  <page number="12">
+    <line>Tongchuan, China. Similarly, Planet’s SkySat constellation</line>
+    <line>promises a ground resolution on the order of 0.5 m/px [4],</line>
+    <line>a 20→higher resolution than that of the Sentinel-2 data</line>
+    <line>used in our evaluation. Finally, more e$cient solar arrays,</line>
+    <line>e.g., 135 W [9], are available and more powerful compute</line>
+    <line>resources, e.g., multicore 2nd Generation Intel Xeon Scal-</line>
+    <line>able processors with multiple gigabytes of memory on the</line>
+    <line>HPE Spaceborne Computer-2 [10, 72], have been deployed</line>
+    <line>to LEO. Yet, we note that increasing such parameters does</line>
+    <line>not alleviate the pressure to e$ciently downlink data to</line>
+    <line>Earth. With a tenfold increase in compute performance and</line>
+    <line>downlink bandwidth while resolution and service resource</line>
+    <line>requirements also increases tenfold, the entire satellite sys-</line>
+    <line>tem would still require the same e$cient scheduling as in</line>
+    <line>our evaluation. With Trabant we make no assumptions on</line>
+    <line>the absolute resource constraints, instead we target the rela-</line>
+    <line>tive mismatch between available resources and the desire to</line>
+    <line>run as much processing as possible on as data of the highest</line>
+    <line>possible resolution.</line>
+    <line>Constellations. Commercial Earth observation satellite op-</line>
+    <line>erators usually operate tens or hundreds of satellites rather</line>
+    <line>than just one. Constellations of similar satellites allow more</line>
+    <line>frequent frame captures and higher downlink rates, and we</line>
+    <line>imagine that the Trabant approach could also be extended</line>
+    <line>to such constellations. Speci"cally, given a set of tenant ser-</line>
+    <line>vices and a pool of satellites to host these services, we could</line>
+    <line>use the constraints for each satellite set out in §4 to calcu-</line>
+    <line>late service assignments. A service could also be assigned to</line>
+    <line>multiple satellites in di#erent orbits to yield higher visiting</line>
+    <line>frequency. While we focus our evaluation on just a single</line>
+    <line>satellite in this work, we plan to explore the challenges of</line>
+    <line>such assignments in future work.</line>
+    <line>Trust Model. Running a service on shared infrastructure</line>
+    <line>raises questions of trust. Speci"cally, as is also the case in</line>
+    <line>cloud computing, tenants must trust the operator who runs</line>
+    <line>their services. Tenants that process sensitive or otherwise</line>
+    <line>critical data may thus not be able to bene"t from the shared</line>
+    <line>satellite approach. We believe that research on trusted server-</line>
+    <line>less computing [20, 68, 84] can be directly applied here. Con-</line>
+    <line>versely, the operator can largely treat the tenant service as</line>
+    <line>an untrusted workload given the sandboxing in our server-</line>
+    <line>less environment. Functions cannot access data outside their</line>
+    <line>sandbox and can be monitored if they behave abnormally,</line>
+    <line>e.g., consuming too many CPU cycles, as is standard practice</line>
+    <line>in cloud serverless computing [12].</line>
+    <line>Service Isolation. Similarly to trust between operator and</line>
+    <line>tenant, we must also consider isolation of services between</line>
+    <line>tenants, a pressing research challenge in serverless com-</line>
+    <line>puting. Our Trabant prototype uses Docker containers for</line>
+    <line>service management and isolation, yet we are aware that</line>
+    <line>this is associated with security risks [12, 51]. Alternative</line>
+    <line>sandboxing mechanisms from research on serverless edge</line>
+    <line>computing, such as microVMs [12] or unikernels [35, 53],</line>
+    <line>may provide higher levels of isolation at the cost of e$ciency</line>
+    <line>and should be explored for our use-case in future work.</line>
+    <line>Resource Pricing. We consider the pricing of functions on</line>
+    <line>a Trabant satellite out of scope for this paper, but "nd it an</line>
+    <line>interesting avenue for future work. As a starting point, it</line>
+    <line>may be useful to adopt pricing models of cloud serverless</line>
+    <line>compute platforms, which charge for processing time and</line>
+    <line>egress bandwidth [30] (with prices adjusted to capital and</line>
+    <line>operational expense of hosting services on a LEO satellite,</line>
+    <line>of course). We believe that this may also encourage e$cient</line>
+    <line>service implementations.</line>
+    <line>Base Resource Consumption. In our experiments, we found</line>
+    <line>that the base power consumption of the Raspberry Pi 4</line>
+    <line>(1518 mW) consumed over half of the available 2950 mW</line>
+    <line>generated power, a result of the Raspberry Pi not supporting</line>
+    <line>hibernation. Given our approach of time-shifted serverless</line>
+    <line>computing in Trabant, it might instead be possible to power</line>
+    <line>o# the device during periods of low power supply and resume</line>
+    <line>operation later, which we will explore in future research.</line>
+    <line>7</line>
+    <line>Related Work</line>
+    <line>Orbital edge computing has drawn considerable research</line>
+    <line>interest [78, 83]. For example, Giu#rida et al. [36, 37] have</line>
+    <line>demonstrated satellite on-board cloud segment using a CNN</line>
+    <line>model running on an Intel Movidius Myriad 2 hardware</line>
+    <line>accelerator on the ω-Sat-1 satellite. Further, Denby and Lu-</line>
+    <line>cia [27] introduce an OEC architecture for Earth observa-</line>
+    <line>tion missions that parallelizes data collection and processing</line>
+    <line>across a constellation of nanosatellites, which they evaluate</line>
+    <line>with a CNN model identifying building footprint. With Ko-</line>
+    <line>dan, Denby et al. [26] present an approach for ML inference</line>
+    <line>in space using a selection of pre-trained models optimized</line>
+    <line>to operate under the constraints of a target satellite, with</line>
+    <line>the runtime dynamically selecting the best model based on</line>
+    <line>geospatial contexts. Furutanpey et al. [33] present FOOL,</line>
+    <line>an OEC-native feature compression method that leverages</line>
+    <line>inter-tile dependencies to reduce the downlink data size of</line>
+    <line>Earth observation frames in a task-agnostic manner. These</line>
+    <line>approaches are excellent examples of the potential of OEC</line>
+    <line>to reduce the downlink data size in LEO satellites. However,</line>
+    <line>they also illustrate that the focus of most existing OEC re-</line>
+    <line>search is to reduce the downlink rate of indiscriminate frame</line>
+    <line>collection, e.g., by "ltering out pixels obscured by clouds, or</line>
+    <line>to support a single application, i.e., designing the satellite</line>
+    <line>mission to perform a single kind of inference task. We believe</line>
+    <line>that shared satellite platforms o#er a more !exible way of</line>
+    <line>leveraging OEC but have not been su$ciently studied.</line>
+    <line>12</line>
+  </page>
+  <page number="13">
+    <line>Lei and Saeed [47] lay out their vision for constellation-as-</line>
+    <line>a-service satellites with heterogeneous compute resources</line>
+    <line>to support a broad range of customer applications. Their pro-</line>
+    <line>posed system uses containers to host services and allocates</line>
+    <line>resources based on geographical position of the satellite. As</line>
+    <line>no implementation of this system exists at the moment, com-</line>
+    <line>parability remains limited. As we have shown with Trabant, a</line>
+    <line>serverless approach requires minimal con"guration from cus-</line>
+    <line>tomers beyond writing function code and eases deployment</line>
+    <line>logic under the myriad of constraints on an OEC-equipped</line>
+    <line>satellite.</line>
+    <line>O’Donnel et al. [55] extend Amazon Web Services (AWS)</line>
+    <line>edge computing and networking to a LEO satellite in order</line>
+    <line>to seamlessly manage OEC software as if it was running</line>
+    <line>in a traditional cloud. They use AWS IoT Greengrass for</line>
+    <line>lightweight container orchestration and ML inference with</line>
+    <line>Amazon SageMaker, and evaluate their approach with ap-</line>
+    <line>plications such as "re detection and cloud masking. This</line>
+    <line>approach allows for !exible recon"guration of the satellite</line>
+    <line>mission by updating models or applications, yet does not</line>
+    <line>allow sharing of the satellite between di#erent tenants.</line>
+    <line>In the context of the BUPT-1 satellite and the larger Tian-</line>
+    <line>suan constellation of OEC research satellites [79], Wang et</line>
+    <line>al. [77] present a study of cloud-native satellites. The authors</line>
+    <line>argue that using cloud-native technologies, e.g., containers</line>
+    <line>and Kubernetes, signi"cantly simpli"es the development and</line>
+    <line>operation of OEC satellites and software. Their proposed</line>
+    <line>cloud-native satellite architecture allows !exibly allocating a</line>
+    <line>virtualized pool of satellite resources, such as storage, CPU,</line>
+    <line>or hardware accelerators, among di#erent tenant application</line>
+    <line>functions. This closely aligns with the goals of our work, yet</line>
+    <line>we believe that containers are not well-suited for OEC given</line>
+    <line>deployment sizes and in!exibility in resource allocation.</line>
+    <line>We have proposed the use of serverless computing for</line>
+    <line>satellite computing in previous work [59, 60] in the slightly</line>
+    <line>di#erent context of LEO in-network computing. Here, com-</line>
+    <line>pute resources are embedded in LEO satellite communica-</line>
+    <line>tion constellations (instead of Earth observation satellites) to</line>
+    <line>serve clients on the ground with low-latency access to com-</line>
+    <line>pute services. In this context, stateless serverless functions</line>
+    <line>can be seamlessly migrated across interconnected satellites</line>
+    <line>to maintain a static location from the perspective of a ground</line>
+    <line>observer. While related to this work, communications con-</line>
+    <line>stellations di#er in size, use-case, and capacity to the Earth</line>
+    <line>observation satellites we target with Trabant.</line>
+    <line>8</line>
+    <line>Conclusion</line>
+    <line>Orbital edge computing reduces the data transmission needs</line>
+    <line>of Earth observation satellites by processing sensor data on-</line>
+    <line>board, allowing near-real-time insights while minimizing</line>
+    <line>downlink costs. Current orbital edge computing architec-</line>
+    <line>tures are in!exible and require intricate mission planning</line>
+    <line>that involves upfront knowledge of the OEC software.</line>
+    <line>In this paper, we have argued for shared satellite plat-</line>
+    <line>forms that allow multiple clients to execute custom code</line>
+    <line>on-board the satellite to "lter and analyze sensor data. To</line>
+    <line>enable running unknown code from multiple tenants on</line>
+    <line>satellite hardware with varying power and temperature con-</line>
+    <line>straints, we leverage the Function-as-a-Service paradigm.</line>
+    <line>We present Trabant, a serverless satellite software platform</line>
+    <line>that reduces operational complexities using automated time-</line>
+    <line>shifted computing. We demonstrate its capabilities with a</line>
+    <line>proof-of-concept prototype and evaluate it using real satellite</line>
+    <line>computing telemetry data. Our "ndings suggest that Trabant</line>
+    <line>reduces mission planning overheads, o#ering a scalable and</line>
+    <line>e$cient platform Earth observation missions. Future work</line>
+    <line>on Trabant includes investigating deployment optimization</line>
+    <line>and evaluation on real satellite hardware.</line>
+    <line>Acknowledgments</line>
+    <line>We thank Ruolin Xing, Mengwei Xu, and Shangguang Wang</line>
+    <line>from Beijing University of Posts and Telecommunications</line>
+    <line>for their continued support in understanding the intricacies</line>
+    <line>of the BUPT-1 satellite.</line>
+    <line>Partially funded by the Bundesministerium für Bildung</line>
+    <line>und Forschung (BMBF, German Federal Ministry of Educa-</line>
+    <line>tion and Research) in the scope of the Software Campus 3.0</line>
+    <line>(Technische Universität Berlin) program – 01IS23068.</line>
+    <line>References</line>
+    <line>[1] Humans in the Loop 2020.</line>
+    <line>Semantic segmentation of aerial im-</line>
+    <line>agery.</line>
+    <line>Humans in the Loop.</line>
+    <line>Retrieved October 18, 2024</line>
+    <line>from https://www.kaggle.com/datasets/humansintheloop/semantic-</line>
+    <line>segmentation-of-aerial-imagery</line>
+    <line>[2] Cubesat Market 2023. KRATOS 1U Ready to Fly Cubesat Platform.</line>
+    <line>Cubesat Market. Retrieved August 28, 2024 from https://www.cubesat.</line>
+    <line>market/kratos1uplatform</line>
+    <line>[3] European Space Agency 2023. Overview of Sentinel-2 Mission. Eu-</line>
+    <line>ropean Space Agency.</line>
+    <line>Retrieved October 18, 2024 from https:</line>
+    <line>//sentiwiki.copernicus.eu/web/s2-mission</line>
+    <line>[4] Planet Labs 2023. Planet Imagery Product Speci#cations. Planet Labs.</line>
+    <line>Retrieved April 9, 2025 from https://assets.planet.com/docs/Planet_</line>
+    <line>Combined_Imagery_Product_Specs_letter_screen.pdf</line>
+    <line>[5] Unibap AB 2023.</line>
+    <line>SpaceCloudOS &amp; SpaceCloudFW.</line>
+    <line>Unibap AB.</line>
+    <line>Retrieved October 18, 2024 from https://unibap.com/wp-content/</line>
+    <line>uploads/2023/12/spacecloud-os-fw.pdf</line>
+    <line>[6] Union of Concerned Scientists 2023. UCS Satellite Database. Union of</line>
+    <line>Concerned Scientists. Retrieved August 23, 2024 from https://www.</line>
+    <line>ucsusa.org/resources/satellite-database</line>
+    <line>[7] National Environmental Satellite, Data, and Information Service (NES-</line>
+    <line>DIS) 2023. Visible Infrared Imaging Radiometer Suite (VIIRS). National</line>
+    <line>Environmental Satellite, Data, and Information Service (NESDIS).</line>
+    <line>Retrieved October 18, 2024 from https://www.nesdis.noaa.gov/our-</line>
+    <line>satellites/currently-!ying/joint-polar-satellite-system/visible-</line>
+    <line>infrared-imaging-radiometer-suite-viirs</line>
+    <line>13</line>
+  </page>
+  <page number="14">
+    <line>[8] OrbitsEdge, Inc. 2024. Edge Computing &amp; Micro Datacenters in Space.</line>
+    <line>OrbitsEdge, Inc. Retrieved October 18, 2024 from https://orbitsedge.</line>
+    <line>com/edge-in-space</line>
+    <line>[9] Pumpkin Space Systems 2025.</line>
+    <line>135W Dual Articulated Deploy-</line>
+    <line>able Solar Array.</line>
+    <line>Pumpkin Space Systems.</line>
+    <line>Retrieved April 9,</line>
+    <line>2025 from https://www.pumpkinspace.com/store/p215/135W_Dual_</line>
+    <line>Articulated_Deployable_Solar_Array.html</line>
+    <line>[10] NASA Spino# Technology Transfer Program 2025. Cutting-Edge Com-</line>
+    <line>puting Goes Spaceborne. NASA Spino# Technology Transfer Pro-</line>
+    <line>gram. Retrieved April 9, 2025 from https://spino#.nasa.gov/Cutting-</line>
+    <line>Edge_Computing_Goes_Spaceborne</line>
+    <line>[11] Abdelghani Aaba. 2021. Wild#re Prediction Dataset (Satellite Images).</line>
+    <line>Retrieved October 18, 2024 from https://www.kaggle.com/datasets/</line>
+    <line>abdelghaniaaba/wild"re-prediction-dataset</line>
+    <line>[12] Alexandru Agache, Marc Brooker, Alexandra Iordache, Anthony</line>
+    <line>Liguori, Rolf Neugebauer, Phil Piwonka, and Diana-Maria Popa. 2020.</line>
+    <line>Firecracker: Lightweight virtualization for serverless applications. In</line>
+    <line>Proceedings of the 17th USENIX Symposium on Networked Systems De-</line>
+    <line>sign and Implementation (Santa Clara, CA, USA) (NSDI ’20). USENIX</line>
+    <line>Association, Berkeley, CA, USA, 419–434.</line>
+    <line>[13] Antonio Pertusa Antonio-Javier Gallego and Pablo Gil. 2018. Auto-</line>
+    <line>matic Ship Classi"cation from Optical Aerial Images with Convolu-</line>
+    <line>tional Neural Networks. Remote Sensing 10, 4, Article 511 (April 2018),</line>
+    <line>20 pages. doi:10.3390/rs10040511</line>
+    <line>[14] Austin P. Arechiga, Alan J. Michaels, and Jonathan T. Black. 2018.</line>
+    <line>Onboard Image Processing for Small Satellites. In Proceedings of the</line>
+    <line>IEEE National Aerospace and Electronics Conference (Dayton, OH, USA)</line>
+    <line>(NAECON 2018). IEEE, New York, NY, USA, 234–240. doi:10.1109/</line>
+    <line>NAECON.2018.8556744</line>
+    <line>[15] Mohammad S. Aslanpour, Adel N. Toosi, Claudio Cicconetti, Bahman</line>
+    <line>Javadi, Peter Sbarski, Davide Taibi, Marcos Assuncao, Sukhpal Singh</line>
+    <line>Gill, Raj Gaire, and Schahram Dustdar. 2021. Serverless Edge Comput-</line>
+    <line>ing: Vision and Challenges. In Proceedings of the 2021 Australasian Com-</line>
+    <line>puter Science Week Multiconference (Dunedin, New Zealand) (ACSW</line>
+    <line>’21). Association for Computing Machinery, New York, NY, USA, 1–10.</line>
+    <line>doi:10.1145/3437378.3444367</line>
+    <line>[16] Matej Bati%. 2018. Sentinel Hub Cloud Detector — s2cloudless. Sentinel</line>
+    <line>Hub. Retrieved October 18, 2024 from https://medium.com/sentinel-</line>
+    <line>hub/sentinel-hub-cloud-detector-s2cloudless-a67d263d3025</line>
+    <line>[17] Aaron C. Boley and Michael Byers. 2021. Satellite mega-constellations</line>
+    <line>create risks in Low Earth Orbit, the atmosphere and on Earth. Scienti#c</line>
+    <line>Reports 11, Article 10642 (May 2021), 8 pages. doi:10.1038/s41598-021-</line>
+    <line>89909-7</line>
+    <line>[18] Jasper Bouwmeester and Jian Guo. 2010. Survey of worldwide pico-</line>
+    <line>and nanosatellite missions, distributions and subsystem technology.</line>
+    <line>Acta Astronautica 67, 7–8 (June 2010), 854–862. doi:10.1016/j.actaastro.</line>
+    <line>2010.06.004</line>
+    <line>[19] Justin D. Braaten, Warren B. Cohen, and Zhiqiang Yang. 2015. Auto-</line>
+    <line>mated cloud and cloud shadow identi"cation in Landsat MSS imagery</line>
+    <line>for temperate ecosystems. Remote Sensing of Environment 169 (Aug.</line>
+    <line>2015), 128–138. doi:10.1016/j.rse.2015.08.006</line>
+    <line>[20] Stefan Brenner and Rüdiger Kapitza. 2019. Trust more, serverless.</line>
+    <line>In Proceedings of the 12th ACM International Conference on Systems</line>
+    <line>and Storage (Haifa, Israel) (SYSTOR ’19). Association for Computing</line>
+    <line>Machinery, New York, NY, USA, 33–43. doi:10.1145/3319647.3325825</line>
+    <line>[21] Changyong Cao, Xiaoxiong (Jack) Xiong, Robert Wolfe, Frank DeLuc-</line>
+    <line>cia, Quanhua (Mark) Liu, Slawomir Blonski, Guoqing (Gary) Lin,</line>
+    <line>Masahiro Nishihama, Dave Pogorzala, Hassan Oudrari, and Don Hill-</line>
+    <line>ger. 2013. Visible Infrared Imaging Radiometer Suite (VIIRS) Sensor Data</line>
+    <line>Record (SDR) User’s Guide. Technical Report 142. National Environ-</line>
+    <line>mental Satellite, Data, and Information Service, National Oceanic and</line>
+    <line>Atmospheric Administration, U.S. DEPARTMENT OF COMMERCE,</line>
+    <line>Washington, D.C., USA. https://nsidc.org/sites/default/"les/viirs-sdr-</line>
+    <line>users-guide.pdf</line>
+    <line>[22] Jeroen Cappaert. 2018. Building, Deploying and Operating a Cubesat</line>
+    <line>Constellation - Exploring the Less Obvious Reasons Space is Hard. In</line>
+    <line>Proceedings of the 32nd Annual Small Satellite Conference (Logan, UT,</line>
+    <line>USA) (SmallSat ’18). Utah State University, Logan, UT, USA.</line>
+    <line>[23] Justin Carnahan, Amy Hutputanasin, Alicia Johnstone, Wenschel Lan,</line>
+    <line>Simon Lee, Arash Mehrpavar, Riki Munakata, David Pignatelli, and</line>
+    <line>Armen Toorian. 2022. Cubesat Design Speci#cation (1U – 12U), Rev.</line>
+    <line>14.1. Technical Report CP-CDS-R14.1. California Polytechnic State</line>
+    <line>University, San Luis Obispo, CA, USA. https://www.cubesat.org/s/</line>
+    <line>CDS-REV14_1-2022-02-09.pdf</line>
+    <line>[24] Dakai Chen, Edward Wilcox, Raymond L. Ladbury, Christina Seidleck,</line>
+    <line>Hak Kim, Anthony Phan, and Kenneth A. LaBel. 2017. Heavy Ion and</line>
+    <line>Proton-Induced Single Event Upset Characteristics of a 3-D NAND</line>
+    <line>Flash Memory. IEEE Transactions on Nuclear Science 65, 1 (Oct. 2017),</line>
+    <line>19–26. doi:10.1109/TNS.2017.2764852</line>
+    <line>[25] Alfredos-Panagiotis Damkalis, Daniel Esparon, and Jack Philpott. 2024.</line>
+    <line>SatNOGS DB – Kanyini. Libre Space Foundation. Retrieved August</line>
+    <line>29, 2024 from https://db.satnogs.org/satellite/98890#data</line>
+    <line>[26] Bradley Denby, Krishna Chintalapudi, Ranveer Chandra, Brandon</line>
+    <line>Lucia, and Shadi Noghabi. 2023. Kodan: Addressing the Computational</line>
+    <line>Bottleneck in Space. In Proceedings of the 28th ACM International</line>
+    <line>Conference on Architectural Support for Programming Languages and</line>
+    <line>Operating Systems (Vancouver, BC, Canada) (ASPLOS ’23). Association</line>
+    <line>for Computing Machinery, New York, NY, USA, 392–403. doi:10.1145/</line>
+    <line>3582016.3582043</line>
+    <line>[27] Bradley Denby and Brandon Lucia. 2020. Orbital Edge Computing:</line>
+    <line>Nanosatellite Constellations as a New Class of Computer System.</line>
+    <line>In Proceedings of the Twenty-Fifth International Conference on Archi-</line>
+    <line>tectural Support for Programming Languages and Operating Systems</line>
+    <line>(Lausanne, Switzerland) (ASPLOS ’20). Association for Computing Ma-</line>
+    <line>chinery, New York, NY, USA, 939–954. doi:10.1145/3373376.3378473</line>
+    <line>[28] Kiruthika Devaraj, Matt Ligon, Eric Blossom, Joseph Breu, Bryan</line>
+    <line>Klofas, Kyle Colton, and Ryan Kingsbury. 2019. Planet high speed</line>
+    <line>radio: Crossing Gbps from a 3U cubesat. In Proceedings of the 33rd</line>
+    <line>Annual Small Satellite Conference (Logan, UT, USA) (SmallSat ’19).</line>
+    <line>Utah State University, Logan, UT, USA.</line>
+    <line>[29] Matthias Drusch, Umberto Del Bello, Sébastien Carlier, Olivier Colin,</line>
+    <line>Veronica Fernandez, Ferran Gascon, Bianca Hoersch, Claudia Isola,</line>
+    <line>Paolo Laberinti, Philippe Martimort, et al. 2012. Sentinel-2: ESA’s</line>
+    <line>optical high-resolution mission for GMES operational services. Remote</line>
+    <line>sensing of Environment 120 (Feb. 2012), 25–36. doi:10.1016/j.rse.2011.</line>
+    <line>11.026</line>
+    <line>[30] Tarek Elgamal, Atul Sandur, Klara Nahrstedt, and Gul Agha. 2018.</line>
+    <line>Costless: Optimizing Cost of Serverless Computing through Function</line>
+    <line>Fusion and Placement. In Proceedings of the 2018 IEEE/ACM Symposium</line>
+    <line>on Edge Computing (Seattle, WA, USA) (SEC ’18). IEEE, New York, NY,</line>
+    <line>USA, 300–312. doi:10.1109/SEC.2018.00029</line>
+    <line>[31] José P. Ferreira, Ziyu Huang, Ken-ichi Nomura, and Joseph Wang.</line>
+    <line>2024. Potential Ozone Depletion From Satellite Demise During At-</line>
+    <line>mospheric Reentry in the Era of Mega-Constellations. Geophysical</line>
+    <line>Research Letters 51, 11, Article e2024GL109280 (June 2024). doi:10.</line>
+    <line>1029/2024GL109280</line>
+    <line>[32] Gianluca Furano, Gabriele Meoni, Aubrey Dunne, David Moloney,</line>
+    <line>Veronique Ferlet-Cavrois, Antonis Tavoularis, Jonathan Byrne, Léonie</line>
+    <line>Buckley, Mihalis Psarakis, Kay-Obbe Voss, and Luca Fanucci. 2020.</line>
+    <line>Towards the Use of Arti"cial Intelligence on the Edge in Space Systems:</line>
+    <line>Challenges and Opportunities. IEEE Aerospace and Electronic Systems</line>
+    <line>Magazine 35, 12 (Dec. 2020), 44–56. doi:10.1109/MAES.2020.3008468</line>
+    <line>[33] Alireza Furutanpey, Qiyang Zhang, Philipp Raith, Tobias Pfandzelter,</line>
+    <line>Shangguang Wang, and Schahram Dustdar. 2025. FOOL: Addressing</line>
+    <line>14</line>
+  </page>
+  <page number="15">
+    <line>the Downlink Bottleneck in Satellite Computing with Neural Feature</line>
+    <line>Compression. IEEE Transactions on Mobile Computing (Feb. 2025).</line>
+    <line>doi:10.1109/TMC.2025.3544516</line>
+    <line>[34] Jose L. Garcia. 2021. 9 - Electric power systems. In Cubesat Handbook,</line>
+    <line>Chantal Cappelletti, Simone Battistini, and Benjamin K. Malphrus</line>
+    <line>(Eds.). Academic Press, 185–197. doi:10.1016/B978-0-12-817884-3.</line>
+    <line>00009-6</line>
+    <line>[35] Dániel Géhberger and Dávid Kovács. 2022. Cooling down faas: To-</line>
+    <line>wards getting rid of warm starts. (June 2022). arXiv:2206.00599</line>
+    <line>[36] Gianluca Giu#rida, Lorenzo Diana, Francesco de Gioia, Gionata Benelli,</line>
+    <line>Gabriele Meoni, Massimiliano Donati, and Luca Fanucci. 2020. Cloud-</line>
+    <line>Scout: A deep neural network for on-board cloud detection on hy-</line>
+    <line>perspectral images. Remote Sensing 12, 14, Article 2205 (July 2020),</line>
+    <line>17 pages. doi:10.3390/rs12142205</line>
+    <line>[37] Gianluca Giu#rida, Luca Fanucci, Gabriele Meoni, Matej Bati%, Léonie</line>
+    <line>Buckley, Aubrey Dunne, Chris Van Dijk, Marco Esposito, John Hefele,</line>
+    <line>Gianluca Vercruyssen, Nathan Furano, Massimiliano Pastena, and</line>
+    <line>Josef Aschbacher. 2021. The ω-Sat-1 Mission: The First On-Board</line>
+    <line>Deep Neural Network Demonstrator for Satellite Earth Observation.</line>
+    <line>IEEE Transactions on Geoscience and Remote Sensing 60 (Nov. 2021),</line>
+    <line>1–14. doi:10.1109/TGRS.2021.3125567</line>
+    <line>[38] Jared Michael Greene, Mohammed Faraz Admani, Jacob Nelson Glueck,</line>
+    <line>Sergii Ziuzin, Francesco De Paolis, Dhruv Dawar, and Christopher Yu.</line>
+    <line>2022. System and method of providing access to compute resources dis-</line>
+    <line>tributed across a group of satellites. US Patent App. US20230164089A1:</line>
+    <line>"led Sep. 28., 2022.</line>
+    <line>[39] Ehab H. Hegazi, Abdellateif A. Samak, Lingbo Yang, Ran Huang, and</line>
+    <line>Jingfeng Huang. 2023.</line>
+    <line>Prediction of Soil Moisture Content from</line>
+    <line>Sentinel-2 Images Using Convolutional Neural Network (CNN). Agron-</line>
+    <line>omy 13, 3, Article 656 (Feb. 2023), 18 pages. doi:10.3390/rs10040511</line>
+    <line>[40] Patrick Helber, Benjamin Bischke, Andreas Dengel, and Damian Borth.</line>
+    <line>2019. EuroSAT: A Novel Dataset and Deep Learning Benchmark for</line>
+    <line>Land Use and Land Cover Classi"cation. IEEE Journal of Selected Topics</line>
+    <line>in Applied Earth Observations and Remote Sensing 12, 7 (June 2019),</line>
+    <line>2217–2226. doi:10.1109/JSTARS.2019.2918242</line>
+    <line>[41] Scott Hendrickson, Stephen Sturdevant, Tyler Harter, Venkateshwaran</line>
+    <line>Venkataramani, Andrea C. Arpaci-Dusseau, and Remzi H. Arpaci-</line>
+    <line>Dusseau. 2016. Serverless Computation with OpenLambda. In Pro-</line>
+    <line>ceedings of the 8th USENIX Workshop on Hot Topics in Cloud Computing</line>
+    <line>(Denver, CO, USA) (HotCloud ’16). USENIX Association, Berkeley, CA,</line>
+    <line>USA, 33–39.</line>
+    <line>[42] Maximilian Henkel, Vladimir Zelenevskiy, Georges Labrèche, Rodrigo</line>
+    <line>Laurinovics, David Evans, Dominik Marszk, and Omiros Papadatos</line>
+    <line>Vasilakis. 2024. Mitigating and Recovering from Radiation Induced</line>
+    <line>Faults in Non-Hardened Spacecraft Flash Memory. In Proceedings of</line>
+    <line>the 2024 IEEE Aerospace Conference (Big Sky, MT, USA) (AERO ’24).</line>
+    <line>IEEE, New York, NY, USA, 1–8. doi:10.1109/AERO58975.2024.10521125</line>
+    <line>[43] Brent Horine. 2021. Creating a Marketplace for a Constellation as a</line>
+    <line>Service. In Proceedings of the 38th Annual Small Satellite Conference</line>
+    <line>(Logan, UT, USA) (SmallSat ’21). Utah State University, Logan, UT,</line>
+    <line>USA.</line>
+    <line>[44] Eric Jonas, Johann Schleier-Smith, Vikram Sreekanti, Chia-Che Tsai,</line>
+    <line>Anurag Khandelwal, Qifan Pu, Vaishaal Shankar, Joao Menezes Car-</line>
+    <line>reira, Karl Krauth, Neeraja Yadwadkar, Joseph Gonzalez, Raluca Ada</line>
+    <line>Popa, Ion Stoica, and David A. Patterson. 2019. Cloud Programming</line>
+    <line>Simpli#ed: A Berkeley View on Serverless Computing. Technical Re-</line>
+    <line>port UCB/EECS-2019-3. EECS Department, University of California,</line>
+    <line>Berkeley, Berkeley, CA, USA. https://www2.eecs.berkeley.edu/Pubs/</line>
+    <line>TechRpts/2019/EECS-2019-3.html</line>
+    <line>[45] Donald J. Kessler and Burton G. Cour-Palais. 1978. Collision fre-</line>
+    <line>quency of arti"cial satellites: The creation of a debris belt. Journal</line>
+    <line>of Geophysical Research: Space Physics 83, 6 (June 1978), 2637–2646.</line>
+    <line>doi:10.1029/JA083iA06p02637</line>
+    <line>[46] Michael D. King, Steven Platnick, W. Paul Menzel, Steven A. Ackerman,</line>
+    <line>and Paul A. Hubanks. 2013. Spatial and Temporal Distribution of</line>
+    <line>Clouds Observed by MODIS Onboard the Terra and Aqua Satellites.</line>
+    <line>IEEE Transactions on Geoscience and Remote Sensing 51, 7 (Jan. 2013),</line>
+    <line>3826–3852. doi:10.1109/TGRS.2012.2227333</line>
+    <line>[47] Demi Lei and Ahmed Saeed. 2024. Do We Need a Million Satellites in</line>
+    <line>Orbit? Constellation-as-a-Service with Modular Satellites: Challenges</line>
+    <line>and Opportunities. In Proceedings of the 2nd International Workshop</line>
+    <line>on LEO Networking and Communication (Washington, DC, USA) (LEO-</line>
+    <line>NET ’24). Association for Computing Machinery, New York, NY, USA,</line>
+    <line>61–66. doi:10.1145/3697253.3697262</line>
+    <line>[48] Israel Leyva-Mayorga, Marc Martinez-Gost, Marco Moretti, Ana Pérez-</line>
+    <line>Neira, Miguel Ángel Vázquez, Petar Popovski, and Beatriz Soret. 2023.</line>
+    <line>Satellite Edge Computing for Real-Time and Very-High Resolution</line>
+    <line>Earth Observation. IEEE Transactions on Communications 71, 10 (July</line>
+    <line>2023), 6180–6194. doi:10.1109/TCOMM.2023.3296584</line>
+    <line>[49] Sha Lu, Eriita Jones, Liang Zhao, Yu Sun, Kai Qin, Jixue Liu, Jiuyong</line>
+    <line>Li, Prabath Abeysekara, Norman Mueller, Simon Oliver, Jim O’Hehir,</line>
+    <line>and Stefan Peters. 2024. Onboard AI for Fire Smoke Detection us-</line>
+    <line>ing Hyperspectral Imagery: an Emulation for the Upcoming Kanyini</line>
+    <line>Hyperscout-2 Mission. IEEE Journal of Selected Topics in Applied</line>
+    <line>Earth Observations and Remote Sensing 17 (April 2024), 9629–9640.</line>
+    <line>doi:10.1109/JSTARS.2024.3394574</line>
+    <line>[50] Catherine G. Manning and Abigail Bowman. 2023. SCaN Glossary. Na-</line>
+    <line>tional Aeronautics and Space Administration, Space Communications</line>
+    <line>and Navigation (SCaN) Program.</line>
+    <line>Retrieved August 28, 2024 from</line>
+    <line>https://www.nasa.gov/reference/scan-glossary/</line>
+    <line>[51] Eyal Manor. 2018.</line>
+    <line>Bringing the best of serverless to you.</line>
+    <line>Google Cloud Platform.</line>
+    <line>Retrieved February 12, 2024 from</line>
+    <line>https://cloudplatform.googleblog.com/2018/07/bringing-the-best-of-</line>
+    <line>serverless-to-you.html</line>
+    <line>[52] Jonathan C. McDowell. 2020. The Low Earth Orbit Satellite Population</line>
+    <line>and Impacts of the SpaceX Starlink Constellation. The Astrophysical</line>
+    <line>Journal Letters 892, 2, Article L36 (April 2020), 10 pages. doi:10.3847/</line>
+    <line>2041-8213/ab8016</line>
+    <line>[53] Felix Moebius, Tobias Pfandzelter, and David Bermbach. 2024. Are</line>
+    <line>Unikernels Ready for Serverless on the Edge?. In Proceedings of the 12th</line>
+    <line>IEEE International Conference on Cloud Engineering (Paphos, Cyprus)</line>
+    <line>(IC2E ’24). IEEE, New York, NY, USA, 133–143. doi:10.1109/IC2E61754.</line>
+    <line>2024.00022</line>
+    <line>[54] Cristóbal Nieto-Peroy and M. Reza Emami. 2019. CubeSat Mission:</line>
+    <line>From Design to Operation. Applied Sciences 9, 15, Article 3110 (Aug.</line>
+    <line>2019), 24 pages. doi:10.3390/app9153110</line>
+    <line>[55] Kathryn O’Donnell, Meghan Weber, Joy Fasnacht, Je# Maynard, Mar-</line>
+    <line>garet Cote, and Shayn Hawthorne. 2023. Extension of cloud computing</line>
+    <line>to small satellites. In Proceedings of the 37th Annual Small Satellite</line>
+    <line>Conference (Logan, UT, USA) (SmallSat ’23). Utah State University,</line>
+    <line>Logan, UT, USA, 304–318.</line>
+    <line>[56] Nathan Pemberton and Johann Schleier-Smith. 2019. The serverless</line>
+    <line>data center: Hardware disaggregation meets serverless computing.</line>
+    <line>In Proceedings of the The First Workshop on Resource Disaggregation</line>
+    <line>(Providence, RI, USA) (WORD ’19).</line>
+    <line>http://word19.ece.cornell.edu/</line>
+    <line>serverless_data_center.pdf</line>
+    <line>[57] Tobias Pfandzelter and David Bermbach. 2020. tinyFaaS: A Light-</line>
+    <line>weight FaaS Platform for Edge Environments. In Proceedings of</line>
+    <line>the Second IEEE International Conference on Fog Computing (Syd-</line>
+    <line>ney, NSW, Australia) (ICFC 2020). IEEE, New York, NY, USA, 17–24.</line>
+    <line>doi:10.1109/ICFC49376.2020.00011</line>
+    <line>[58] Tobias Pfandzelter and David Bermbach. 2023. Edge Computing in</line>
+    <line>Low-Earth Orbit – What Could Possibly Go Wrong?. In Proceedings of</line>
+    <line>the the 1st ACM Workshop on LEO Networking and Communication 2023</line>
+    <line>15</line>
+  </page>
+  <page number="16">
+    <line>(Madrid, Spain) (LEO-NET ’23). Association for Computing Machinery,</line>
+    <line>New York, NY, USA, 19–24. doi:10.1145/3614204.3616106</line>
+    <line>[59] Tobias Pfandzelter and David Bermbach. 2024. Komet: A Serverless</line>
+    <line>Platform for Low-Earth Orbit Edge Services. In Proceedings of the 15th</line>
+    <line>ACM Symposium on Cloud Computing (Redmond, WA, USA) (SoCC ’24).</line>
+    <line>Association for Computing Machinery, New York, NY, USA, 866–882.</line>
+    <line>doi:10.1145/3698038.3698517</line>
+    <line>[60] Tobias Pfandzelter, Jonathan Hasenburg, and David Bermbach. 2021.</line>
+    <line>Towards a Computing Platform for the LEO Edge. In Proceedings of the</line>
+    <line>4th International Workshop on Edge Systems, Analytics and Networking</line>
+    <line>(Online, United Kingdom) (EdgeSys ’21). Association for Computing</line>
+    <line>Machinery, New York, NY, USA, 43–48. doi:10.1145/3434770.3459736</line>
+    <line>[61] Ryne P. Ra#aelle. 2023. 9 - Introduction to CubeSat power systems.</line>
+    <line>In Next Generation CubeSats and SmallSats, Francesco Branz, Chantal</line>
+    <line>Cappelletti, Antonio J. Ricco, and John W. Hines (Eds.). Elsevier, 201–</line>
+    <line>221. doi:10.1016/B978-0-12-824541-5.00008-X</line>
+    <line>[62] Philipp Raith, Stefan Nastic, and Schahram Dustdar. 2023. Serverless</line>
+    <line>Edge Computing – Where We Are and What Lies Ahead. IEEE Internet</line>
+    <line>Computing 27, 3 (May 2023), 50–64. doi:10.1109/MIC.2023.3260939</line>
+    <line>[63] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. 2015. U-Net:</line>
+    <line>Convolutional Networks for Biomedical Image Segmentation. In Pro-</line>
+    <line>ceedings of the Medical image computing and computer-assisted inter-</line>
+    <line>vention (Munich, Germany) (MICCAI ’15). Springer, Cham, Switzerland,</line>
+    <line>234–241. doi:10.1007/978-3-319-24574-4_28</line>
+    <line>[64] Robert G. Ryan, Eloise A. Marais, Chloe J. Balhatchet, and Sebas-</line>
+    <line>tian D. Eastham. 2022.</line>
+    <line>Impact of Rocket Launch and Space De-</line>
+    <line>bris Air Pollutant Emissions on Stratospheric Ozone and Global</line>
+    <line>Climate.</line>
+    <line>Earth’s Future 10, 6, Article e2021EF002612 (June 2022).</line>
+    <line>doi:10.1029/2021EF002612</line>
+    <line>[65] Alireza Sahraei, Soteris Demetriou, Amirali Sobhgol, Haoran Zhang,</line>
+    <line>Abhigna Nagaraja, Neeraj Pathak, Girish Joshi, Carla Souza, Bo Huang,</line>
+    <line>Wyatt Cook, Andrii Golovei, Pradeep Venkat, Andrew Mcfague, Dim-</line>
+    <line>itrios Skarlatos, Vipul Patel, Ravinder Thind, Ernesto Gonzalez, Yun</line>
+    <line>Jin, and Chunqiang Tang. 2023. XFaaS: Hyperscale and Low Cost</line>
+    <line>Serverless Functions at Meta. In Proceedings of the 29th Symposium</line>
+    <line>on Operating Systems Principles (Koblenz, Germany) (SOSP ’23). As-</line>
+    <line>sociation for Computing Machinery, New York, NY, USA, 231–246.</line>
+    <line>doi:10.1145/3600006.3613155</line>
+    <line>[66] Antonio Pertusa Samer Alashhab, Antonio-Javier Gallego and Pablo</line>
+    <line>Gil. 2019. Precise Ship Location With CNN Filter Selection From</line>
+    <line>Optical Aerial Images. IEEE Access 7 (July 2019), 96567–96582. doi:10.</line>
+    <line>1109/ACCESS.2019.2929080</line>
+    <line>[67] Trever Schirmer, Valentin Carl, Tobias Pfandzelter, and David</line>
+    <line>Bermbach. 2023. ProFaaStinate: Delaying Serverless Function Calls</line>
+    <line>to Optimize Platform Performance. In Proceedings of the 9th Inter-</line>
+    <line>national Workshop on Serverless Computing (Bologna, Italy) (WoSC</line>
+    <line>’23). Association for Computing Machinery, New York, NY, USA, 1–6.</line>
+    <line>doi:10.1145/3631295.3631393</line>
+    <line>[68] Avishka Shamendra, Binoy Peries, Gayangi Seneviratne, and Sunimal</line>
+    <line>Rathnayake. 2023. TruFaaS-Trust Veri"cation Framework for FaaS.</line>
+    <line>In Proceedings of the International Conference on Ubiquitous Security</line>
+    <line>(Exeter, UK) (UbiSec ’23). Springer, Cham, Switzerland, 304–318. doi:10.</line>
+    <line>1007/978-981-97-1274-8_20</line>
+    <line>[69] Weisong Shi and Schahram Dustdar. 2016. The Promise of Edge</line>
+    <line>Computing. Computer 49, 5 (May 2016), 78–81. doi:10.1109/MC.2016.</line>
+    <line>145</line>
+    <line>[70] Windy S. Slater, Nayana P. Tiwari, Tyler M. Lovelly, and Jesse K.</line>
+    <line>Mee. 2020. Total Ionizing Dose Radiation Testing of NVIDIA Jetson</line>
+    <line>Nano GPUs. In Proceedings of the 2020 IEEE High Performance Extreme</line>
+    <line>Computing Conference (Waltham, MA, USA) (HPEC ’20). IEEE, New</line>
+    <line>York, NY, USA, 1–3. doi:10.1109/HPEC43674.2020.9286222</line>
+    <line>[71] Beatriz Soret, Israel Leyva-Mayorga, Antonio M. Mercado-Martínez,</line>
+    <line>Marco Moretti, Antonio Jurado-Navas, Marc Martinez-Gost, Celia</line>
+    <line>Sánchez de Miguel, Ainoa Salas-Prendes, and Petar Popovski. 2024.</line>
+    <line>Semantic and goal-oriented edge computing for satellite Earth Obser-</line>
+    <line>vation. (Aug. 2024). arXiv:2408.15639</line>
+    <line>[72] Richard Speed. 2021. HPE Spaceborne Computer-2 slips o" the shelf –</line>
+    <line>and o" the planet: Boxen heading to ISS. The Register. Retrieved April 9,</line>
+    <line>2025 from https://www.theregister.com/2021/02/11/hpe_spaceborne_</line>
+    <line>2_iss/</line>
+    <line>[73] Gencer Sumbul, Marcela Charfuelan, Begüm Demir, and Volker</line>
+    <line>Markl. 2019.</line>
+    <line>Bigearthnet: A Large-Scale Benchmark Archive for</line>
+    <line>Remote Sensing Image Understanding. In Proceedings of the 2019</line>
+    <line>IEEE International Geoscience and Remote Sensing Symposium (Yoko-</line>
+    <line>hama, Japan) (IGARSS ’19). IEEE, New York, NY, USA, 5901–5904.</line>
+    <line>doi:10.1109/IGARSS.2019.8900532</line>
+    <line>[74] Daniel J Varon, Dylan Jervis, Jason McKeever, Ian Spence, David Gains,</line>
+    <line>and Daniel J Jacob. 2021. High-frequency monitoring of anomalous</line>
+    <line>methane point sources with multispectral Sentinel-2 satellite observa-</line>
+    <line>tions. Atmospheric Measurement Techniques 14, 4 (April 2021), 2771–</line>
+    <line>2785. doi:10.5194/amt-14-2771-2021</line>
+    <line>[75] Deepak Vasisht, Jayanth Shenoy, and Ranveer Chandra. 2021. L2D2:</line>
+    <line>low latency distributed downlink for LEO satellites. In Proceedings</line>
+    <line>of the 2021 ACM SIGCOMM 2021 Conference (Virtual Event, USA)</line>
+    <line>(SIGCOMM ’21). Association for Computing Machinery, New York,</line>
+    <line>NY, USA, 151–164. doi:10.1145/3452296.3472932</line>
+    <line>[76] Danton José Fortes Villas Boas, José Bezerra Pessoa Filho, Alison</line>
+    <line>de Oliveira Moraes, and Carlos Henrique Melo Souza. 2023. 17 -</line>
+    <line>Innovative and low-cost launch systems. In Next Generation CubeSats</line>
+    <line>and SmallSats, Francesco Branz, Chantal Cappelletti, Antonio J. Ricco,</line>
+    <line>and John W. Hines (Eds.). Elsevier, 403–419. doi:10.1016/B978-0-12-</line>
+    <line>824541-5.00005-4</line>
+    <line>[77] Chao Wang, Yiran Zhang, Qing Li, Ao Zhou, and Shangguang Wang.</line>
+    <line>2023. Satellite Computing: A Case Study of Cloud-Native Satellites.</line>
+    <line>In Proceedings of the 2023 IEEE International Conference on Edge Com-</line>
+    <line>puting and Communications (Chicago, IL, USA) (EDGE ’23). IEEE, New</line>
+    <line>York, NY, USA, 262–270. doi:10.1109/EDGE60047.2023.00048</line>
+    <line>[78] Shangguang Wang and Qing Li. 2023. Satellite Computing: Vision</line>
+    <line>and Challenges. IEEE Internet of Things Journal 10, 24 (Aug. 2023),</line>
+    <line>22514–22529. doi:10.1109/JIOT.2023.3303346</line>
+    <line>[79] Shangguang Wang, Qing Li, Mengwei Xu, Xiao Ma, Ao Zhou, and Qibo</line>
+    <line>Sun. 2021. Tiansuan Constellation: An Open Research Platform. In</line>
+    <line>Proceedings of the 2021 IEEE International Conference on Edge Comput-</line>
+    <line>ing (Chicago, IL, USA) (EDGE ’21). IEEE, New York, NY, USA, 94–101.</line>
+    <line>doi:10.1109/EDGE53862.2021.00022</line>
+    <line>[80] Renchao Xie, Qinqin Tang, Shi Qiao, Han Zhu, F. Richard Yu, and Tao</line>
+    <line>Huang. 2021. When Serverless Computing Meets Edge Computing:</line>
+    <line>Architecture, Challenges, and Open Issuess. IEEE Wireless Communi-</line>
+    <line>cations 28, 5 (July 2021), 126–133. doi:10.1109/MWC.001.2000466</line>
+    <line>[81] Ruolin Xing, Mengwei Xu, Ao Zhou, Qing Li, Yiran Zhang, Feng</line>
+    <line>Qian, and Shangguang Wang. 2024. Deciphering the Enigma of Satel-</line>
+    <line>lite Computing with COTS Devices: Measurement and Analysis. In</line>
+    <line>Proceedings of the 30th Annual International Conference on Mobile Com-</line>
+    <line>puting and Networking (Washington D.C., DC, USA) (MobiCom ’24).</line>
+    <line>Association for Computing Machinery, New York, NY, USA, 420–435.</line>
+    <line>doi:10.1145/3636534.3649371</line>
+    <line>[82] Boris Yendler. 2021. 16 - Thermal control system. In Cubesat Handbook,</line>
+    <line>Chantal Cappelletti, Simone Battistini, and Benjamin K. Malphrus</line>
+    <line>(Eds.). Academic Press, 303–317. doi:10.1016/B978-0-12-817884-3.</line>
+    <line>00016-3</line>
+    <line>[83] Yin Zengshan, Wu Changhao, Guo Chongbin, Li Yuanchun, Xu Meng-</line>
+    <line>wei, Gao Weiwei, and Chi Chuanxiu. 2024. A comprehensive sur-</line>
+    <line>vey of orbital edge computing: Systems, applications, and algorithms.</line>
+    <line>16</line>
+  </page>
+  <page number="17">
+    <line>Chinese Journal of Aeronautics, Article 3316 (Nov. 2024), 30 pages.</line>
+    <line>doi:10.1016/j.cja.2024.11.026 arXiv:2306.00275</line>
+    <line>[84] Denghui Zhang, Lijing Ren, Muhammad Sha"q, and Zhaoquan Gu.</line>
+    <line>2022. A Lightweight Privacy-Preserving System for the Security of</line>
+    <line>Remote Sensing Images on IoT. Remote Sensing 14, 24, Article 6371</line>
+    <line>(Dec. 2022), 16 pages. doi:10.3390/rs14246371</line>
+    <line>17</line>
+  </page>
+</document>
