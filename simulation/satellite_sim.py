@@ -222,7 +222,7 @@ class ThermalSubsystem:
         cooling = self.cfg.thermal_cooling_coeff * (self.t_chip - self.cfg.thermal_ambient_c)
         self.t_chip += heating - cooling
 
-    def is_throttling(self) -> bool:
+    def is_throttling(self) -> bool: # TODO
         return self.t_chip >= self.cfg.thermal_throttle_limit_c
 
 
