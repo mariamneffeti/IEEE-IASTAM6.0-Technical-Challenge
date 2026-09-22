@@ -1,1 +1,11 @@
 __pycache__
+# Python bytecode and local environments
+*.py[cod]
+.venv/
+
+# LaTeX intermediate files (keep the compiled paper PDF)
+paper/build/*.aux
+paper/build/*.log
+paper/build/*.out
+paper/build/*.toc
+paper/build/missfont.log
