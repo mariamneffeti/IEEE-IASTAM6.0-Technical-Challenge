@@ -6,6 +6,7 @@ def heuristic_agent(sat: Satellite) -> List[Dict]:
     drop stale payloads when storage is tight."""
     actions: List[Dict] = []
     tel = sat.get_telemetry()
+    downlink_id = None
 
     if tel["in_safe_mode"]:
         return actions
@@ -17,14 +18,20 @@ def heuristic_agent(sat: Satellite) -> List[Dict]:
             key=lambda p: (p.processed, p.current_value(sat.env.time_step)),
             reverse=True,
         )
-        for p in ranked[:3]:
-            actions.append({"type": "downlink", "payload_id": p.id})
+        # One action per one-second tick; the simulator has one shared link
+        # budget, so additional payload requests would only be rejected.
+        if ranked:
+            actions.append({"type": "downlink", "payload_id": ranked[0].id})
+            downlink_id = ranked[0].id
 
     # --- Process when battery & thermal headroom exist ---
     if (tel["battery_soc"] > 0.5
             and not tel["is_throttling"]
             and tel["queue_length"] < 2):
-        unprocessed = [p for p in sat.mmu_payloads if not p.processed]
+        unprocessed = [p for p in sat.mmu_payloads
+                       if not p.processed and not p.partially_transmitted
+                       and p.id != downlink_id
+                       and p.size_mb <= sat.cfg.ram_capacity_mb]
         if unprocessed:
             best = max(unprocessed,
                        key=lambda p: p.current_value(sat.env.time_step))

@@ -13,8 +13,7 @@ def test_environment():
         check_env(env, warn=True)
         print("check_env passed successfully!")
     except Exception as e:
-        print(f"check_env failed: {e}")
-        return
+        raise AssertionError(f"check_env failed: {e}") from e
 
     print("\n--- Running Custom Masked Action Loop ---")
     # Reset to start a fresh 3-orbit episode
@@ -33,7 +32,7 @@ def test_environment():
         for j in range(env.top_k):
             valid_actions = np.where(mask[j])[0]
             if len(valid_actions) > 0:
-                action[j] = np.random.choice(valid_actions)
+                action[j] = env.np_random.choice(valid_actions)
             else:
                 action[j] = 0 # fallback
         
@@ -41,12 +40,10 @@ def test_environment():
         obs, reward, terminated, truncated, info = env.step(action)
         total_reward += reward
         
-        # 4. Assert NO errors in feedback (except for expected bandwidth exhaustion)
+        # 4. Assert masks prevent invalid simulator actions.
         feedback = info.get("feedback", [])
         for fb in feedback:
             if fb.get("type") == "error":
-                if fb.get("message") == "Bandwidth exhausted this tick":
-                    continue
                 print(f"Step {i} Error Feedback: {fb}")
                 error_count += 1
                 
@@ -61,6 +58,7 @@ def test_environment():
         print("✅ SUCCESS: 0 error feedbacks received. Masking logic perfectly bounded the agent.")
     else:
         print(f"❌ FAILED: Received {error_count} error feedbacks despite masking.")
+        raise AssertionError(f"Masked action loop emitted {error_count} error feedbacks")
 
 if __name__ == "__main__":
     test_environment()

@@ -14,6 +14,7 @@ def do_nothing_policy(sat):
 
 def main():
     print("--- Running Sanity Checks ---")
+    failed = False
     
     # Configuration
     seed = 42
@@ -42,6 +43,7 @@ def main():
         print("✅ Check 1 Passed: The same seed run twice gave identical telemetry tick-by-tick.")
     else:
         print("❌ Check 1 Failed.")
+        failed = True
 
     # ==========================================
     # Check 2: Do-nothing policy
@@ -66,6 +68,8 @@ def main():
         
     if c2_pass:
         print("✅ Check 2 Passed: Do-nothing policy behaved exactly as expected (0 downlinked, drops > 0, no negative storage).")
+    else:
+        failed = True
 
     # ==========================================
     # Check 3: Conservation rules
@@ -98,6 +102,8 @@ def main():
         
     if c3_pass:
         print(f"✅ Check 3 Passed: Downlinks ({tel1['payloads_downlinked']}) <= Generated ({tel1['payloads_generated']}). Bandwidth ({tel3['bandwidth_used_mb']:.2f} MB) <= Max GS limit ({max_possible_bw:.2f} MB).")
+    else:
+        failed = True
 
     # ==========================================
     # Check 4: Policy independence on data generation
@@ -112,6 +118,10 @@ def main():
         print("❌ Check 4 Failed: Generation logic diverged between policies!")
         print(f"Idle: {tel_idle['payloads_generated']} | Heur: {tel_heur['payloads_generated']}")
         print(f"Idle Val: {tel_idle['total_generated_value_snapshot']} | Heur Val: {tel_heur['total_generated_value_snapshot']}")
+        failed = True
+
+    if failed:
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     main()

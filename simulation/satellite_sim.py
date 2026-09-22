@@ -85,6 +85,46 @@ class SimConfig:
     downlink_mb_per_s: float = field(init=False)
 
     def __post_init__(self):
+        positive = {
+            "orbit_period_s": self.orbit_period_s,
+            "battery_capacity_wh": self.battery_capacity_wh,
+            "mmu_capacity_mb": self.mmu_capacity_mb,
+            "ram_capacity_mb": self.ram_capacity_mb,
+            "data_gen_interval": self.data_gen_interval,
+            "downlink_bandwidth_mbps": self.downlink_bandwidth_mbps,
+            "gs_duration_min": self.gs_duration_min,
+            "gs_duration_max": self.gs_duration_max,
+        }
+        invalid = [name for name, value in positive.items() if value <= 0]
+        if invalid:
+            raise ValueError(f"Configuration values must be positive: {', '.join(invalid)}")
+        if not 0.0 <= self.min_dod_fraction < 1.0:
+            raise ValueError("min_dod_fraction must be in [0, 1)")
+        if not 0.0 <= self.seu_probability <= 1.0:
+            raise ValueError("seu_probability must be in [0, 1]")
+        if not 0 < self.sunlit_duration_s < self.orbit_period_s:
+            raise ValueError("sunlit_duration_s must be between 0 and orbit_period_s")
+        if self.gs_start_min < 0 or self.gs_start_max < self.gs_start_min:
+            raise ValueError("ground-station start range must be nonnegative and ordered")
+        if self.gs_start_max + self.gs_duration_max >= self.orbit_period_s:
+            raise ValueError("ground-station window must end before the orbit boundary")
+        if self.gs_duration_max < self.gs_duration_min:
+            raise ValueError("ground-station duration range must be ordered")
+        if not (0.0 < self.compression_ratio <= 1.0 and 0.0 < self.inference_ratio <= 1.0):
+            raise ValueError("processing size ratios must be in (0, 1]")
+        if not (0.0 <= self.optical_weight <= 1.0
+                and 0.0 <= self.sar_weight <= 1.0
+                and math.isclose(self.optical_weight + self.sar_weight, 1.0)):
+            raise ValueError("modality weights must be in [0, 1] and sum to 1")
+        for name, low, high in (
+            ("optical_size", self.optical_size_min_mb, self.optical_size_max_mb),
+            ("sar_size", self.sar_size_min_mb, self.sar_size_max_mb),
+            ("payload_value", self.payload_value_min, self.payload_value_max),
+            ("payload_decay", self.payload_decay_min, self.payload_decay_max),
+        ):
+            if low < 0 or high < low:
+                raise ValueError(f"{name} bounds must be nonnegative and ordered")
+
         self.battery_capacity_j = self.battery_capacity_wh * 3600
         self.min_dod_j = self.min_dod_fraction * self.battery_capacity_j
         self.safe_mode_exit_j = self.min_dod_j * self.safe_mode_exit_margin
@@ -115,6 +155,7 @@ class Payload:
     creation_time: int
     processed: bool = False
     processing_mode: str = "raw"  # raw, compressed, inference
+    partially_transmitted: bool = False
 
     def current_value(self, current_time: int) -> float:
         dt = current_time - self.creation_time
@@ -201,7 +242,7 @@ class Environment:
             self.solar_power = 0.0
 
         # Ground station pass
-        self.in_gs_pass = self.gs_start <= orbit_time <= self.gs_end
+        self.in_gs_pass = self.gs_start <= orbit_time < self.gs_end
 
 
 class PowerSubsystem:
@@ -538,6 +579,12 @@ class Satellite:
                                      "payload_id": payload_id,
                                      "message": "Payload not found"})
                     continue
+
+                if payload.partially_transmitted and not payload.processed:
+                    feedback.append({"type": "error", "action": "process",
+                                     "payload_id": payload_id,
+                                     "message": "Cannot process a partially transmitted payload"})
+                    continue
                 if payload.processed:
                     feedback.append({"type": "error", "action": "process",
                                      "payload_id": payload_id,
@@ -619,6 +666,7 @@ class Satellite:
                                      "payload_id": payload_id,
                                      "message": "Complete"})
                 else:
+                    payload.partially_transmitted = True
                     feedback.append({"type": "partial", "action": "downlink",
                                      "payload_id": payload_id,
                                      "remaining_mb": payload.size_mb})
@@ -712,6 +760,7 @@ class Satellite:
         total_draw = (self.cfg.base_power_w
                       + self.active_compute_w
                       + self.active_comm_w)
+        tick_energy_draw = total_draw
 
         has_power = self.power.apply_power(self.env.solar_power, total_draw)
         if not has_power:
@@ -727,7 +776,7 @@ class Satellite:
                     "message": "Brownout during tick, entering safe mode",
                 })
 
-        self.cumulative_energy_j += self.active_compute_w + self.active_comm_w
+        self.cumulative_energy_j += tick_energy_draw
 
         # Thermal model sees total power dissipation (compute + comm + base)
         self.thermal.step(total_draw)

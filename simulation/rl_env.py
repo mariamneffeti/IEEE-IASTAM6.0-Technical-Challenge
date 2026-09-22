@@ -128,14 +128,16 @@ class SatelliteEnv(gym.Env):
             if i < len(sorted_payloads):
                 p = sorted_payloads[i]
                 
-                if not p.processed and process_slots_granted < queue_slots_available:
+                if (not p.processed and not p.partially_transmitted
+                        and p.size_mb <= self.cfg.ram_capacity_mb
+                        and process_slots_granted < queue_slots_available):
                     # Can process if not already processed AND queue has room
                     mask[i, 1] = True  # Compress
                     mask[i, 2] = True  # Inference
                     process_slots_granted += 1
                 
-                if tel["in_gs_pass"]:
-                    # Can downlink if in GS pass (raw downlinks are allowed)
+                if tel["in_gs_pass"] and i == 0:
+                    # The link budget is shared across the tick; grant one slot.
                     mask[i, 3] = True
                 
                 # Can always drop an existing payload

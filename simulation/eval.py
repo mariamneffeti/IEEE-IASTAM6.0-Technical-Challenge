@@ -78,9 +78,13 @@ def evaluate_policy(
     model_or_func=None,
     n_episodes: int = 5,
     base_seed: int = 42,
-    n_orbits: int = 3,
+    n_orbits: int = 4,
     output_path: str = None,
 ):
+    if n_episodes < 1 or n_orbits < 1:
+        raise ValueError("n_episodes and n_orbits must both be at least 1")
+    if policy_type not in {"heuristic", "rl"}:
+        raise ValueError(f"Unsupported policy_type: {policy_type!r}")
     print(f"Evaluating {policy_type} over {n_episodes} episodes...")
     seeds = [base_seed + i for i in range(n_episodes)]
 
@@ -121,11 +125,9 @@ def evaluate_policy(
         if tel["payloads_generated"] > 0:
             completed_task_rate = tel["payloads_downlinked"] / tel["payloads_generated"]
 
-        latency = 0.0
-        total_payloads = tel["payloads_downlinked"] + len(sat.queued_ages())
-        if total_payloads > 0:
-            latency_sum = tel["cumulative_latency"] + sum(sat.queued_ages())
-            latency = latency_sum / total_payloads
+        # Report end-to-end latency only for fully delivered payloads.
+        latency = (tel["cumulative_latency"] / tel["payloads_downlinked"]
+                   if tel["payloads_downlinked"] else 0.0)
 
         mmu_utilization = (
             tel["cumulative_mmu_usage_mb"] / (max_steps * sat.cfg.mmu_capacity_mb)
@@ -164,9 +166,14 @@ def evaluate_policy(
         # Two-sided Student-t critical values for common episode counts.
         t_critical = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776,
                       6: 2.571, 7: 2.447, 8: 2.365, 9: 2.306,
-                      10: 2.262}.get(len(results), 1.96)
+                      10: 2.262, 11: 2.228, 12: 2.201, 13: 2.179,
+                      14: 2.160, 15: 2.145, 16: 2.131, 17: 2.120,
+                      18: 2.110, 19: 2.101, 20: 2.093, 21: 2.086,
+                      22: 2.080, 23: 2.074, 24: 2.069, 25: 2.064,
+                      26: 2.060, 27: 2.056, 28: 2.052, 29: 2.048,
+                      30: 2.045}.get(len(results), 1.96)
         half_width = t_critical * values["Std"] / math.sqrt(len(results))
-        values["CI95 Low"] = values["Mean"] - half_width
+        values["CI95 Low"] = max(0.0, values["Mean"] - half_width)
         values["CI95 High"] = values["Mean"] + half_width
         print(f"{metric:<30} {values['Mean']:>14.4f} {values['Std']:>14.4f} "
               f"[{values['CI95 Low']:.4f}, {values['CI95 High']:.4f}]")
@@ -176,7 +183,8 @@ def evaluate_policy(
         result_path.parent.mkdir(parents=True, exist_ok=True)
         fields = ["Metric", "Mean", "Std", "CI95 Low", "CI95 High"]
         with result_path.open("w", newline="", encoding="utf-8") as output_file:
-            writer = csv.DictWriter(output_file, fieldnames=fields)
+            writer = csv.DictWriter(output_file, fieldnames=fields,
+                                    lineterminator="\n")
             writer.writeheader()
             for metric, values in summary.items():
                 writer.writerow({"Metric": metric, **values})
@@ -189,7 +197,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate the heuristic policy.")
     parser.add_argument("--episodes", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--orbits", type=int, default=3)
+    parser.add_argument("--orbits", type=int, default=4)
     parser.add_argument("--output", default="results/heuristic_summary.csv")
     args = parser.parse_args()
     evaluate_policy("heuristic", heuristic_agent, n_episodes=args.episodes,

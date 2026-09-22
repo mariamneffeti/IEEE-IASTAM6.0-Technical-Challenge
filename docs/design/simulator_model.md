@@ -199,7 +199,7 @@ Effect: RAM is wiped, the accelerator resets to `sleep`, and the whole processin
 
 ### 9.1 Payloads
 
-A payload arrives every 15 s (360 per orbit, **1,080 per 3-orbit episode**).
+A payload arrives every 15 s (360 per orbit, **1,440 per 4-orbit episode**).
 
 | | Optical (70%) | SAR (30%) |
 |---|---|---|
@@ -242,11 +242,11 @@ All metrics come from counters on `Satellite`, not from the RL reward, so any po
 |---|---|---|
 | Decision quality | `downlinked_utility / total_generated_value_snapshot` | value at delivery (decayed and degraded) over raw generated `base_value` |
 | Completed-task rate | `payloads_downlinked / payloads_generated` | counts delivered payloads |
-| Energy | `cumulative_energy_j` | **marginal** compute + comm energy, **excluding the 5 W base load** (constant across policies, so excluding it makes differences visible) |
-| Latency | creation to full delivery, in seconds | `cumulative_latency / payloads_downlinked`, plus a variant including ages from `queued_ages()` |
+| Energy | `cumulative_energy_j` | Total modeled base + compute + communication energy draw; a brownout tick records the requested draw before safe-mode reset |
+| Latency | creation to full delivery, in seconds | `cumulative_latency / payloads_downlinked`; unfinished queue ages are not mixed into completed-task latency |
 | Resource utilisation | mean occupancy of MMU and RAM, bandwidth used / available, throttle % | `cumulative_*_usage_mb`, `bandwidth_used_mb`, `throttle_ticks` |
 
-Extra counters (`peak_*`, `dropped_value`, `seu_events`, `safe_mode_events`, drops) exist for analysis and cannot be reconstructed after a run. Energy is counted *after* the brownout zeroing, so a failed tick does not count energy that was never spent.
+Extra counters (`peak_*`, `dropped_value`, `seu_events`, `safe_mode_events`, drops) exist for analysis and cannot be reconstructed after a run. Energy records the load requested during the tick, including the tick in which brownout triggers.
 
 **Reading storage metrics.** `mmu_usage_mb` (and so `cumulative_mmu_usage_mb` and `peak_mmu_mb`) includes the bytes of payloads held in the processing queue. The `mmu_files` telemetry field counts only payloads still listed for downlink or drop, so the number of stored payloads is `mmu_files + queue_length`. `queued_ages()` already covers both groups.
 
@@ -281,11 +281,11 @@ Worth knowing before trusting RL results, and worth mentioning in a limitations 
 4. **One GS pass per orbit** with constant bandwidth, no link budget, and no weather. `time_to_next_gs` reads 0 during a pass, so the *remaining* pass time is not observable from telemetry.
 5. **Deterministic processing.** Inference and compression always succeed and always give fixed ratios. There is no model accuracy, false-positive or content dependence.
 6. **Serial compute only.** One job at a time, with no CPU/GPU load metric.
-7. **Partial downlinks mutate `size_mb`.** The original payload size is lost, so later value-density or data-volume metrics need an `original_size_mb` field. A partly downlinked payload also remains eligible for `process`; the job then compresses or infers only the remaining bytes, which has no physical meaning. Consider rejecting `process` on a payload whose size has been reduced.
+7. **Partial downlinks mutate `size_mb`.** The original payload size is lost, so later value-density or data-volume metrics need an `original_size_mb` field. Partially transmitted raw payloads are now explicitly marked and rejected by processing policies; direct invalid process requests return an error.
 8. **GS sentinel.** `_randomize_gs_pass` treats `next_gs_start == 0` as "first call". That is safe while `gs_start_min >= 1`, but a stress scenario with `gs_start_min = 0` could re-trigger initialisation. Use an explicit flag if you change that range.
 9. **Priority is only value.** There are no explicit priority classes or deadlines beyond exponential decay.
 10. **A warm accelerator is free and sticky.** The `active` state draws no idle power, and it is parked only when step 5 runs with an empty queue or a throttled chip while the state is `active`. Compression jobs do not touch the state, so once the accelerator is warm, a `[compress, infer]` sequence does not pay the 2-tick wake, and an inference job queued on the first tick after another job finishes stays warm. A policy that re-queues promptly can therefore avoid the 60 J cold-start cost more often than the per-job arithmetic in Section 5.1 suggests. A `waking` accelerator is never parked: its countdown simply freezes while the chip is throttled. SEU, safe mode and brownout still reset the state to `sleep`.
-11. **A brownout tick still delivers its downlinks.** Actions run in step 4 and the power check runs in step 6. If a tick browns out, the radio power is zeroed and safe mode begins, but any downlink already executed that tick keeps its bandwidth use and credited utility, even though the energy for it was never spent. The effect is at most one tick of bandwidth (2.5 MB) per brownout, so it is small, but it is a free delivery.
+11. **A brownout tick still delivers its downlinks.** Actions run in step 4 and the power check runs in step 6. If a tick browns out, safe mode begins after any downlink has already been applied, so that transmission is credited even though the battery floor was reached. The energy counter records the requested tick draw, but action rollback is not modeled; a future safety-focused model should validate power before committing actions.
 
 ### 12.1 Resolved since the previous revision
 
@@ -307,4 +307,4 @@ Worth knowing before trusting RL results, and worth mentioning in a limitations 
 
 - **Cloud cover affects optical value** (`base_value *= 1 - cloud_cover`). SAR is unaffected, which is physically motivated. The random-number consumption order is unchanged. **Only optical values changed**, so any baseline numbers computed before that change are out of date.
 - **`peak_temp_c` initialises to `thermal_ambient_c`**, so stress scenarios with a shifted ambient report the right peak.
-- Value-ratio degradation, GS pre-roll and lookahead, the metric counters, energy counted after brownout, and the `queued_ages()` helper.
+- Value-ratio degradation, GS pre-roll and lookahead, the metric counters, energy accounting, and the `queued_ages()` helper.
