@@ -1,7 +1,7 @@
 import numpy as np
 from gymnasium.utils.env_checker import check_env
 
-from rl_env import SatelliteEnv
+from simulation.rl_env import SatelliteEnv
 
 def test_environment():
     print("Initializing SatelliteEnv...")

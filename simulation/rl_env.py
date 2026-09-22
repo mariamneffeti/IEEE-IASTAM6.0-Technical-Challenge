@@ -2,7 +2,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 
-from satellite_sim import Satellite, SimConfig
+from simulation.satellite_sim import Satellite, SimConfig
 
 class SatelliteEnv(gym.Env):
     """

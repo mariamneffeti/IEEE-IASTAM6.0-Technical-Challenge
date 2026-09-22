@@ -1,8 +1,10 @@
-import numpy as np
-import pandas as pd
-from satellite_sim import Satellite, SimConfig
-from baseline import heuristic_agent
-from rl_env import SatelliteEnv
+import argparse
+import csv
+import statistics
+import math
+from pathlib import Path
+from simulation.satellite_sim import Satellite, SimConfig
+from simulation.baseline import heuristic_agent
 
 
 def heuristic_adapter(sat: Satellite, func) -> list:
@@ -20,6 +22,8 @@ class RLAdapterState:
     """
 
     def __init__(self, model, cfg: SimConfig = None):
+        from simulation.rl_env import SatelliteEnv
+
         self.model = model
         self._env = SatelliteEnv(cfg=cfg or SimConfig())
 
@@ -74,6 +78,8 @@ def evaluate_policy(
     model_or_func=None,
     n_episodes: int = 5,
     base_seed: int = 42,
+    n_orbits: int = 3,
+    output_path: str = None,
 ):
     print(f"Evaluating {policy_type} over {n_episodes} episodes...")
     seeds = [base_seed + i for i in range(n_episodes)]
@@ -87,7 +93,7 @@ def evaluate_policy(
 
     for seed in seeds:
         sat = Satellite(seed=seed)
-        max_steps = sat.cfg.orbit_period_s * 3  # 3 orbits
+        max_steps = sat.cfg.orbit_period_s * n_orbits
 
         # Bind the RL adapter to this episode's satellite
         if rl_adapter is not None:
@@ -141,17 +147,51 @@ def evaluate_policy(
             }
         )
 
-    df = pd.DataFrame(results)
+    # Sample standard deviation matches pandas' default (ddof=1).
+    metric_names = results[0].keys()
+    summary = {
+        metric: {
+            "Mean": statistics.mean(row[metric] for row in results),
+            "Std": statistics.stdev(row[metric] for row in results)
+            if len(results) > 1 else 0.0,
+        }
+        for metric in metric_names
+    }
 
-    # Calculate mean and std
-    summary = pd.DataFrame({"Mean": df.mean(), "Std": df.std()}).T
+    print("\n--- Evaluation Results (mean ± sample std) ---")
+    print(f"{'Metric':<30} {'Mean':>14} {'Std':>14} {'95% CI':>25}")
+    for metric, values in summary.items():
+        # Two-sided Student-t critical values for common episode counts.
+        t_critical = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776,
+                      6: 2.571, 7: 2.447, 8: 2.365, 9: 2.306,
+                      10: 2.262}.get(len(results), 1.96)
+        half_width = t_critical * values["Std"] / math.sqrt(len(results))
+        values["CI95 Low"] = values["Mean"] - half_width
+        values["CI95 High"] = values["Mean"] + half_width
+        print(f"{metric:<30} {values['Mean']:>14.4f} {values['Std']:>14.4f} "
+              f"[{values['CI95 Low']:.4f}, {values['CI95 High']:.4f}]")
 
-    print("\n--- Evaluation Results ---")
-    print(summary.to_string(float_format="%.2f"))
+    if output_path:
+        result_path = Path(output_path)
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        fields = ["Metric", "Mean", "Std", "CI95 Low", "CI95 High"]
+        with result_path.open("w", newline="", encoding="utf-8") as output_file:
+            writer = csv.DictWriter(output_file, fieldnames=fields)
+            writer.writeheader()
+            for metric, values in summary.items():
+                writer.writerow({"Metric": metric, **values})
+        print(f"Saved summary CSV: {result_path}")
 
     return summary
 
 
 if __name__ == "__main__":
-    # Baseline run with heuristic agent
-    evaluate_policy("heuristic", heuristic_agent)
+    parser = argparse.ArgumentParser(description="Evaluate the heuristic policy.")
+    parser.add_argument("--episodes", type=int, default=5)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--orbits", type=int, default=3)
+    parser.add_argument("--output", default="results/heuristic_summary.csv")
+    args = parser.parse_args()
+    evaluate_policy("heuristic", heuristic_agent, n_episodes=args.episodes,
+                    base_seed=args.seed, n_orbits=args.orbits,
+                    output_path=args.output)

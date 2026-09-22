@@ -1,6 +1,6 @@
 import sys
-from satellite_sim import Satellite
-from baseline import heuristic_agent
+from simulation.satellite_sim import Satellite
+from simulation.baseline import heuristic_agent
 
 def assert_identical_telemetry(t1, t2, step):
     for k in t1:

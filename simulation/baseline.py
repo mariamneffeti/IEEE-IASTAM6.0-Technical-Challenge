@@ -1,5 +1,5 @@
 from typing import List, Dict
-from satellite_sim import Satellite
+from simulation.satellite_sim import Satellite
 
 def heuristic_agent(sat: Satellite) -> List[Dict]:
     """Compress/infer when power is healthy, downlink during GS pass,

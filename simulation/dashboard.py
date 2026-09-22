@@ -21,8 +21,8 @@ from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Input, Output, State, callback_context, no_update
 import dash_bootstrap_components as dbc
 
-from satellite_sim import Satellite, SimConfig
-from baseline import heuristic_agent
+from simulation.satellite_sim import Satellite, SimConfig
+from simulation.baseline import heuristic_agent
 
 # ---------------------------------------------------------------------------
 # Theme constants
