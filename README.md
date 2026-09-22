@@ -7,7 +7,7 @@ A research prototype for deciding when a LEO Earth-observation satellite should 
 - **Simulator:** seeded 90-minute orbit clock, 55-minute sunlight / 35-minute eclipse, randomized 120–180 second ground-station windows, 100 Wh battery model, 20 Mbps downlink, synthetic optical/SAR payloads, simplified first-order thermal proxy, and per-second RAM-reset SEU events.
 - **Policy:** multi-threshold heuristic in `simulation/baseline.py`.
 - **Learning environment:** Gymnasium environment in `simulation/rl_env.py`; trained-policy results are not included.
-- **Evaluation:** five three-orbit heuristic episodes by default. This is a single-policy characterization; transmit-all, greedy-edge, Lyapunov, and MILP comparisons are not yet implemented.
+- **Evaluation:** five four-orbit heuristic episodes by default. This is a single-policy characterization; transmit-all, greedy-edge, Lyapunov, and MILP comparisons are not yet implemented.
 - **Thermal limitation:** the 50°C threshold pauses compute but does not enforce a hard cap. The saved seed-42 two-orbit trace reaches 52.48°C.
 
 The simulator is a research abstraction, not a flight-calibrated or high-fidelity radiation/thermal model. See [the simulator model notes](docs/design/simulator_model.md) for assumptions and limitations.
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 Run the implemented heuristic evaluation and regenerate the two-orbit figure from the repository root:
 
 ```bash
-python -m simulation.eval --episodes 5 --seed 42 --orbits 3 --output results/heuristic_summary.csv
+python -m simulation.eval --episodes 5 --seed 42 --orbits 4 --output results/heuristic_summary.csv
 python -m simulation.plot_trajectory
 ```
 
