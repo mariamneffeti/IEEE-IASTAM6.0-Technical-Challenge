@@ -7,7 +7,7 @@ A research prototype for deciding when a LEO Earth-observation satellite should 
 - **Simulator:** seeded 90-minute orbit clock, 55-minute sunlight / 35-minute eclipse, randomized 120–180 second ground-station windows, 100 Wh battery model, 20 Mbps downlink, synthetic optical/SAR payloads, simplified first-order thermal proxy, and per-second RAM-reset SEU events.
 - **Policy:** multi-threshold heuristic in `simulation/baseline.py`.
 - **Learning environment:** Gymnasium environment in `simulation/rl_env.py`; trained-policy results are not included.
-- **Evaluation:** five four-orbit heuristic episodes by default. This is a single-policy characterization; transmit-all, greedy-edge, Lyapunov, and MILP comparisons are not yet implemented.
+- **Evaluation:** five four-orbit heuristic episodes by default. The current run reports a mean decision-quality ratio of 0.0283, completed-task rate of 0.0153, total modeled energy of 291.414 kJ, and completed-delivery latency of 654.00 s. These are simulator results with five seeds, not flight measurements. This is a single-policy characterization; transmit-all, greedy-edge, Lyapunov, and MILP comparisons are not yet implemented.
 - **Thermal limitation:** the 50°C threshold pauses compute but does not enforce a hard cap. The saved seed-42 two-orbit trace reaches 52.48°C.
 
 The simulator is a research abstraction, not a flight-calibrated or high-fidelity radiation/thermal model. See [the simulator model notes](docs/design/simulator_model.md) for assumptions and limitations.
@@ -17,20 +17,22 @@ The simulator is a research abstraction, not a flight-calibrated or high-fidelit
 ```text
 .
 ├── simulation/              # Simulator, heuristic, Gymnasium environment, evaluator, dashboard
-├── tests/                   # Sanity and environment verification scripts
-├── configs/                 # Experiment configurations (planned; current defaults are in SimConfig)
-├── results/                 # Reproducible generated plots and evaluation outputs
+├── tests/                   # Determinism, conservation, and Gymnasium environment checks
+├── configs/                 # Configuration-loading support is planned; defaults are in SimConfig
+├── results/                 # Five-seed summary CSV and two-orbit trajectory figures
 ├── docs/
 │   ├── challenge/           # Official specification, context, dates
-│   ├── design/              # Architecture and simulator model notes
-│   └── research/            # Literature and reading notes
+│   ├── design/              # Architecture diagrams and simulator model notes
+│   └── research/            # Literature notes and source papers
 ├── paper/
 │   ├── source/              # IEEE LaTeX source and class
-│   ├── build/                # Compiled PDF and LaTeX build files
+│   ├── build/               # Compiled PDF and LaTeX build files
 │   └── Process_or_Transmit_IEEE.md
-├── AGENTS.md                # Repository research and collaboration requirements
+├── AGENTS.md                # Research and collaboration requirements
 └── requirements.txt
 ```
+
+The main folders also have short guides: [simulation](simulation/README.md), [configuration status](configs/README.md), and [generated results](results/README.md).
 
 ## Setup and commands
 
@@ -66,4 +68,4 @@ pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../build Proc
 pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../build Process_or_Transmit_IEEE.tex
 ```
 
-The paper currently has author email, team/institution metadata fields awaiting confirmation. See [the project roadmap](docs/roadmap.md) and [challenge context](docs/challenge/problem_context.md).
+The paper source is available as [Markdown](paper/Process_or_Transmit_IEEE.md) and [IEEE LaTeX](paper/source/Process_or_Transmit_IEEE.tex); the current [compiled PDF](paper/build/Process_or_Transmit_IEEE.pdf) is in `paper/build/`. Author email and team/institution metadata fields still need confirmation. See [the project roadmap](docs/roadmap.md) and [challenge context](docs/challenge/problem_context.md).
