@@ -36,8 +36,11 @@ class SatelliteEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         
-        # Instantiate a fresh satellite with the provided seed for domain randomization
-        self.sat = Satellite(cfg=self.cfg, seed=seed if seed is not None else 42)
+        # A supplied seed makes the first reset reproducible. Later automatic
+        # episode resets draw fresh seeds from Gymnasium's seeded RNG.
+        episode_seed = (seed if seed is not None else
+                        int(self.np_random.integers(0, 2**32 - 1)))
+        self.sat = Satellite(cfg=self.cfg, seed=episode_seed)
         
         self.step_count = 0
         self.previous_utility = 0.0
