@@ -23,6 +23,7 @@ The simulator is a research abstraction, not a flight-calibrated or high-fidelit
 ├── docs/
 │   ├── challenge/           # Official specification, context, dates
 │   ├── design/              # Architecture diagrams and simulator model notes
+│   ├── pitch/               # Timed video pitch script
 │   └── research/            # Literature notes and source papers
 ├── paper/
 │   ├── source/              # IEEE LaTeX source and class
