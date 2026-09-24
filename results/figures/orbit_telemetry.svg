@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430">
 <rect width="100%" height="100%" fill="white"/>
 <style>text{font-family:Arial,sans-serif;fill:#222}.grid{stroke:#ddd;stroke-width:1}</style>
-<text x="450" y="22" text-anchor="middle" font-size="16">Heuristic policy telemetry (seed 42, two orbits)</text>
+<text x="450" y="22" text-anchor="middle" font-size="16">ASTRA baseline telemetry (seed 42, two orbits)</text>
 <line class="grid" x1="74" y1="273.3" x2="876" y2="273.3"/>
 <text x="64" y="277.3" text-anchor="end" font-size="11">30</text>
 <line class="grid" x1="74" y1="205.5" x2="876" y2="205.5"/>

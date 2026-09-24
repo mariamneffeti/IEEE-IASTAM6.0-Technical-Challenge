@@ -1,4 +1,4 @@
-# Process or Transmit? An Energy- and Thermal-Aware Onboard Decision Engine for LEO Satellite Data Handling
+# ASTRA: Adaptive Satellite Task and Resource Allocator for LEO Earth Observation
 
 *IASTAM 6.0 Technical Challenge — Track 1: Artificial Intelligence and Onboard Computing (Problem 1)*
 
@@ -11,7 +11,7 @@
 ---
 
 ### Abstract
-Small Earth-observation satellites capture multispectral and Synthetic Aperture Radar data under intermittent contact and constrained onboard resources. This paper studies the IASTAM 6.0 "Process or Transmit?" problem using a seeded, one-second-step LEO simulator and its implemented threshold heuristic. Across five four-orbit episodes (seeds 42--46), the heuristic achieved a mean delivered-utility ratio of 0.0283 (sample standard deviation 0.0024; 95% t interval 0.0252--0.0313) and completed 1.53% of generated payloads. Mean modeled energy draw was 291.41 kJ, mean battery state of charge stayed above the 30% floor, and no safe-mode entry occurred. In a separate two-orbit trace (seed 42), simulated chip temperature reached 52.48$^\circ$C; the simulator throttles compute at 50$^\circ$C but does not enforce a hard temperature cap. These results characterize the current simulator and heuristic; learned-policy, Lyapunov-scheduler, oracle, and hardware-calibration studies remain future work.
+Small Earth-observation satellites capture multispectral and Synthetic Aperture Radar data under intermittent contact and constrained onboard resources. We introduce ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for the IASTAM 6.0 "Process or Transmit?" problem. Its current experiments evaluate a seeded, one-second-step LEO simulator and an implemented threshold heuristic. Across five four-orbit episodes (seeds 42--46), the heuristic achieved a mean delivered-utility ratio of 0.0283 (sample standard deviation 0.0024; 95% t interval 0.0252--0.0313) and completed 1.53% of generated payloads. Mean modeled energy draw was 291.41 kJ, mean battery state of charge stayed above the 30% floor, and no safe-mode entry occurred. In a separate two-orbit trace (seed 42), simulated chip temperature reached 52.48$^\circ$C; the simulator throttles compute at 50$^\circ$C but does not enforce a hard temperature cap. Learned-policy, Lyapunov-scheduler, oracle, and hardware-calibration studies remain future work.
 
 ***Keywords—***orbital edge computing; onboard task scheduling; energy- and thermal-aware computing; Lyapunov optimization; reinforcement learning; Low Earth Orbit; fault tolerance.
 

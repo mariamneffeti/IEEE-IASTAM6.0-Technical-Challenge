@@ -33,7 +33,7 @@ def main():
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
            '<rect width="100%" height="100%" fill="white"/>',
            '<style>text{font-family:Arial,sans-serif;fill:#222}.grid{stroke:#ddd;stroke-width:1}</style>',
-           '<text x="450" y="22" text-anchor="middle" font-size="16">Heuristic policy telemetry (seed 42, two orbits)</text>']
+           '<text x="450" y="22" text-anchor="middle" font-size="16">ASTRA baseline telemetry (seed 42, two orbits)</text>']
     for pct in (30, 50, 70, 90, 100):
         y = point(0, pct, 0, 100)[1]
         svg += [f'<line class="grid" x1="{left}" y1="{y:.1f}" x2="{width-right}" y2="{y:.1f}"/>',
@@ -100,7 +100,7 @@ def main():
             current = point(i, row[column], low, high)
             pdf_line(*prior, *current, color, 1.1)
             prior = current
-    pdf_text(270, 20, "Heuristic policy telemetry (seed 42, two orbits)", 15)
+    pdf_text(270, 20, "ASTRA baseline telemetry (seed 42, two orbits)", 15)
     pdf_text(74, 418, "Mission time (s)", 11)
     pdf_text(300, 414, "Battery SoC (%)", 10)
     pdf_text(465, 414, "Chip temperature (deg C)", 10)

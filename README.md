@@ -1,6 +1,6 @@
-# IASTAM 6.0 Track 1 — Process or Transmit?
+# ASTRA — Adaptive Satellite Task and Resource Allocator
 
-A research prototype for deciding when a LEO Earth-observation satellite should process, queue, downlink, or drop incoming payloads. The repository includes a one-second simulator, a rule-based heuristic, a Gymnasium environment, evaluation and plotting scripts, verification scripts, challenge references, and an IEEE paper draft.
+Our research prototype for IASTAM 6.0 Track 1, Problem 1 (“Process or Transmit?”): deciding when a LEO Earth-observation satellite should process, queue, downlink, or drop incoming payloads. The repository includes a one-second simulator, a rule-based heuristic, a Gymnasium environment, evaluation and plotting scripts, verification scripts, challenge references, and an IEEE paper draft.
 
 ## Current implementation
 

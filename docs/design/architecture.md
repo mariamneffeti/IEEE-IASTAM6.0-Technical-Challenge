@@ -1,6 +1,6 @@
-# Satellite Decision Engine — Full Architecture
+# ASTRA — Target Satellite Decision Engine Architecture
 
-This document defines the architecture for an autonomous satellite decision engine. It integrates a machine learning (RL/CNN) proposal layer with a deterministic, formally verified safety layer.
+This document sketches the target architecture for ASTRA, an autonomous satellite decision engine. Its proposed machine-learning proposal layer and formally verified safety layer are not yet implemented. The current codebase contains a simulator, a rule-based heuristic, and a Gymnasium environment; see the root README for implementation status.
 
 ## 1. Design Principles
 

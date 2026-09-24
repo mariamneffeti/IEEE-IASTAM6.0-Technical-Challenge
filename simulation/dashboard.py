@@ -1,5 +1,5 @@
 """
-Interactive LEO Satellite Orbit Visualization Dashboard
+ASTRA Interactive LEO Satellite Orbit Visualization Dashboard
 ========================================================
 Plotly Dash web application that drives the satellite simulation
 in real time with play/pause/step controls and full telemetry.
@@ -417,11 +417,11 @@ app = Dash(
         dbc.themes.DARKLY,
         "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
     ],
-    title="LEO Satellite Dashboard",
+    title="ASTRA | LEO Satellite Dashboard",
 )
 
 app.index_string = (
-    "<!DOCTYPE html><html><head>{%metas%}<title>LEO Satellite Dashboard</title>"
+    "<!DOCTYPE html><html><head>{%metas%}<title>ASTRA | LEO Satellite Dashboard</title>"
     "{%favicon%}{%css%}<style>" + CUSTOM_CSS + "</style></head>"
     "<body>{%app_entry%}<footer>{%config%}{%scripts%}{%renderer%}</footer></body></html>"
 )
@@ -435,7 +435,7 @@ app.layout = dbc.Container([
     # ── Header row ────────────────────────────────────────────────────
     dbc.Row([
         dbc.Col([
-            html.H4("🛰️ LEO Satellite Simulation",
+            html.H4("🛰️ ASTRA | LEO Satellite Simulation",
                      className="mb-0",
                      style={"fontWeight": "600", "color": COLORS["text"]}),
             html.Small("Real-time orbit & telemetry dashboard",
@@ -666,7 +666,7 @@ def update_dashboard(n_intervals, _step, _reset, speed, is_paused):
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("  LEO Satellite Dashboard")
+    print("  ASTRA | LEO Satellite Dashboard")
     print("  Open  http://127.0.0.1:8050  in your browser")
     print("=" * 50)
     app.run(debug=False, port=8050)

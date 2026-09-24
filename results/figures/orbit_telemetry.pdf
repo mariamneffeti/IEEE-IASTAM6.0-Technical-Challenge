@@ -12,7 +12,7 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 1307045 >>
+<< /Length 1307043 >>
 stream
 q
 1 1 1 rg 0 0 900 430 re f
@@ -21647,7 +21647,7 @@ BT /F1 9 Tf 864.07 35.00 Td (10800) Tj ET
 0.82 0.286 0.357 RG 1.1 w 875.78 193.21 m 875.85 184.47 l S
 0.82 0.286 0.357 RG 1.1 w 875.85 184.47 m 875.93 176.61 l S
 0.82 0.286 0.357 RG 1.1 w 875.93 176.61 m 876.00 169.54 l S
-BT /F1 15 Tf 270.00 410.00 Td (Heuristic policy telemetry \(seed 42, two orbits\)) Tj ET
+BT /F1 15 Tf 270.00 410.00 Td (ASTRA baseline telemetry \(seed 42, two orbits\)) Tj ET
 BT /F1 11 Tf 74.00 12.00 Td (Mission time \(s\)) Tj ET
 BT /F1 10 Tf 300.00 16.00 Td (Battery SoC \(%\)) Tj ET
 BT /F1 10 Tf 465.00 16.00 Td (Chip temperature \(deg C\)) Tj ET
@@ -21665,5 +21665,5 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-1307411
+1307409
 %%EOF
