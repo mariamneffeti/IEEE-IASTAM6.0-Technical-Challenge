@@ -1,10 +1,12 @@
 # Generated results
 
-`heuristic_summary.csv` contains mean, sample standard deviation, and 95% Student-t intervals from five seeded four-orbit heuristic episodes (seeds 42–46). The CSV reports completed-delivery latency and total modeled base, compute, and communication energy. Recreate it and the separate seed-42 two-orbit trajectory figure from the repository root:
+The comparison directory contains a paired benchmark of transmit-all, greedy-edge, the threshold heuristic, and one MaskablePPO checkpoint. Five four-orbit episodes use shared evaluation seeds 1001–1005. PPO was trained with seed 7 for 100,000 requested timesteps; its evaluation produced zero completed tasks, so this is an exploratory negative result rather than a competitive policy. Summary CSVs report means, sample standard deviations, and 95% Student-t intervals. The paired CSV reports episode-wise differences from the heuristic. The policy comparison PDF plots four primary metrics.
 
-```bash
-python -m simulation.eval --episodes 5 --seed 42 --orbits 4 --output results/heuristic_summary.csv
-python -m simulation.plot_trajectory
-```
+Recreate the benchmark and figures from the repository root:
 
-These are simulator results for the implemented heuristic, not flight telemetry or a comparison against unimplemented policies.
+    python -m simulation.train_rl --timesteps 100000 --seed 7 --output results/models/astra_ppo_seed7
+    python -m simulation.compare --policies transmit_all greedy_edge heuristic --rl-model results/models/astra_ppo_seed7.zip --episodes 5 --seed 1001 --orbits 4 --output-dir results/comparison
+    python -m simulation.plot_comparison
+    python -m simulation.plot_trajectory
+
+heuristic_summary.csv preserves the earlier standalone heuristic run (seeds 42–46). These are synthetic simulator results, not flight telemetry. The committed PPO checkpoint is about 203 KB; its metadata records the training seed and simulator configuration.

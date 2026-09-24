@@ -1,72 +1,63 @@
 # ASTRA — Adaptive Satellite Task and Resource Allocator
 
-Our research prototype for IASTAM 6.0 Track 1, Problem 1 (“Process or Transmit?”): deciding when a LEO Earth-observation satellite should process, queue, downlink, or drop incoming payloads. The repository includes a one-second simulator, a rule-based heuristic, a Gymnasium environment, evaluation and plotting scripts, verification scripts, challenge references, and an IEEE paper draft.
+ASTRA is a research prototype for IASTAM 6.0 Track 1, Problem 1 (“Process or Transmit?”): deciding when a LEO Earth-observation satellite should process, queue, downlink, or drop incoming payloads.
 
 ## Current implementation
 
-- **Simulator:** seeded 90-minute orbit clock, 55-minute sunlight / 35-minute eclipse, randomized 120–180 second ground-station windows, 100 Wh battery model, 20 Mbps downlink, synthetic optical/SAR payloads, simplified first-order thermal proxy, and per-second RAM-reset SEU events.
-- **Policy:** multi-threshold heuristic in `simulation/baseline.py`.
-- **Learning environment:** Gymnasium environment in `simulation/rl_env.py`; trained-policy results are not included.
-- **Evaluation:** five four-orbit heuristic episodes by default. The current run reports a mean decision-quality ratio of 0.0283, completed-task rate of 0.0153, total modeled energy of 291.414 kJ, and completed-delivery latency of 654.00 s. These are simulator results with five seeds, not flight measurements. This is a single-policy characterization; transmit-all, greedy-edge, Lyapunov, and MILP comparisons are not yet implemented.
-- **Thermal limitation:** the 50°C threshold pauses compute but does not enforce a hard cap. The saved seed-42 two-orbit trace reaches 52.48°C.
+- **Simulator:** seeded 90-minute orbit clock, 55-minute sunlight / 35-minute eclipse, randomized 120–180 second ground-station windows, 100 Wh battery model, 20 Mbps downlink, synthetic optical/SAR payloads, first-order thermal proxy, and per-second RAM-reset SEU events.
+- **Policies:** transmit-all, greedy-edge, and threshold heuristic are implemented; an initial MaskablePPO policy can be trained in the Gymnasium environment.
+- **Evaluation:** five paired four-orbit episodes (seeds 1001–1005) compare four policies. The heuristic achieved mean decision quality 0.02860; greedy-edge completed the most tasks (0.05167). The single-seed PPO checkpoint completed no tasks, so its lower energy is an inactivity outcome, not a performance gain. Eight metrics, summary statistics, and paired differences are under results/comparison. These are simulator results, not flight measurements.
+- **Not implemented:** Lyapunov scheduling and a MILP oracle remain future comparison targets.
+- **Thermal limitation:** the 50°C threshold pauses compute but does not enforce a hard cap. The seed-42 two-orbit trace reaches 52.48°C.
 
-The simulator is a research abstraction, not a flight-calibrated or high-fidelity radiation/thermal model. See [the simulator model notes](docs/design/simulator_model.md) for assumptions and limitations.
+The simulator is a research abstraction, not a flight-calibrated or high-fidelity radiation/thermal model. See [simulator model notes](docs/design/simulator_model.md).
 
 ## Repository layout
 
-```text
-.
-├── simulation/              # Simulator, heuristic, Gymnasium environment, evaluator, dashboard
-├── tests/                   # Determinism, conservation, and Gymnasium environment checks
-├── configs/                 # Configuration-loading support is planned; defaults are in SimConfig
-├── results/                 # Five-seed summary CSV and two-orbit trajectory figures
-├── docs/
-│   ├── challenge/           # Official specification, context, dates
-│   ├── design/              # Architecture diagrams and simulator model notes
-│   ├── pitch/               # Timed video pitch script
-│   └── research/            # Literature notes and source papers
-├── paper/
-│   ├── source/              # IEEE LaTeX source and class
-│   ├── build/               # Compiled PDF and LaTeX build files
-│   └── Process_or_Transmit_IEEE.md
-├── AGENTS.md                # Research and collaboration requirements
-└── requirements.txt
-```
+    simulation/       Simulator, policies, Gymnasium/RL, training, evaluation, plotting
+    tests/            Determinism, conservation, and Gymnasium environment checks
+    configs/          Configuration-loading support; defaults currently live in SimConfig
+    results/          Paired benchmark data, PPO checkpoint, and generated figures
+    docs/             Challenge, design, research protocol, and pitch materials
+    paper/source/     IEEE LaTeX source and class
+    paper/build/      Compiled PDF and LaTeX build files
+    AGENTS.md         Research and collaboration requirements
+    requirements.txt  Python dependencies
 
-The main folders also have short guides: [simulation](simulation/README.md), [configuration status](configs/README.md), and [generated results](results/README.md).
+See the guides for [simulation](simulation/README.md), [configuration status](configs/README.md), and [generated results](results/README.md).
 
-## Setup and commands
+## Setup
 
-Use Python 3.10+ and install the dependencies from the repository root:
+Use Python 3.10+:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
 
-Run the implemented heuristic evaluation and regenerate the two-orbit figure from the repository root:
+## Train and compare policies
 
-```bash
-python -m simulation.eval --episodes 5 --seed 42 --orbits 4 --output results/heuristic_summary.csv
-python -m simulation.plot_trajectory
-```
+Training seed 7 is separate from the held-out evaluation seeds 1001–1005:
 
-Run the verification scripts when changing the simulator or RL environment:
+    python -m simulation.train_rl --timesteps 100000 --seed 7 --output results/models/astra_ppo_seed7
+    python -m simulation.compare --policies transmit_all greedy_edge heuristic --rl-model results/models/astra_ppo_seed7.zip --episodes 5 --seed 1001 --orbits 4 --output-dir results/comparison
+    python -m simulation.plot_comparison
+    python -m simulation.plot_trajectory
 
-```bash
-python -m tests.test_simulation_invariants
-python -m tests.check_rl_environment
-```
+The benchmark outputs per-episode metrics, mean/standard deviation/95% confidence intervals, and paired differences from the heuristic. Read the [comparison protocol](docs/research/policy_comparison_protocol.md) before interpreting the exploratory PPO result.
 
-Launch the dashboard with `python -m simulation.dashboard`.
+## Verification
 
-Compile the IEEE draft from the repository root:
+    python -m tests.test_simulation_invariants
+    python -m tests.check_rl_environment
 
-```bash
-cd paper/source
-pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../build Process_or_Transmit_IEEE.tex
-pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../build Process_or_Transmit_IEEE.tex
-```
+Launch the dashboard with python -m simulation.dashboard.
 
-The paper source is available as [Markdown](paper/Process_or_Transmit_IEEE.md) and [IEEE LaTeX](paper/source/Process_or_Transmit_IEEE.tex); the current [compiled PDF](paper/build/Process_or_Transmit_IEEE.pdf) is in `paper/build/`. Author email and team/institution metadata fields still need confirmation. See [the project roadmap](docs/roadmap.md) and [challenge context](docs/challenge/problem_context.md).
+## IEEE paper
+
+Compile from the repository root:
+
+    cd paper/source
+    pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../build Process_or_Transmit_IEEE.tex
+    pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../build Process_or_Transmit_IEEE.tex
+
+The draft is available as [Markdown](paper/Process_or_Transmit_IEEE.md) and [IEEE LaTeX](paper/source/Process_or_Transmit_IEEE.tex); the compiled PDF is in [paper/build](paper/build/). Author email and official team/institution metadata still need confirmation. See the [project roadmap](docs/roadmap.md) and [challenge context](docs/challenge/problem_context.md).

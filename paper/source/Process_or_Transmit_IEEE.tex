@@ -29,7 +29,7 @@ Email: [confirm author email addresses]
 \maketitle
 
 \begin{abstract}
-Small Earth-observation satellites capture multispectral and Synthetic Aperture Radar data under intermittent contact and constrained onboard resources. We introduce ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for the IASTAM 6.0 ``Process or Transmit?'' problem. Its current experiments evaluate a seeded, one-second-step LEO simulator and an implemented threshold heuristic. Across five four-orbit episodes (seeds 42--46), the heuristic achieved a mean delivered-utility ratio of 0.0283 (sample standard deviation 0.0024; 95\% t interval 0.0252--0.0313) and completed 1.53\% of generated payloads. Mean modeled energy draw was 291.41 kJ, mean battery state of charge stayed above the 30\% floor, and no safe-mode entry occurred. In a separate two-orbit trace (seed 42), simulated chip temperature reached 52.48$^\circ$C; the simulator throttles compute at 50$^\circ$C but does not enforce a hard temperature cap. Learned-policy, Lyapunov-scheduler, oracle, and hardware-calibration studies remain future work.
+Small Earth-observation satellites capture multispectral and Synthetic Aperture Radar data under intermittent contact and constrained onboard resources. We introduce ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for the IASTAM 6.0 ``Process or Transmit?'' problem. We compare transmit-all, greedy-edge, a threshold heuristic, and an initial MaskablePPO policy in a seeded one-second-step simulator over five paired four-orbit episodes. The heuristic achieved the largest delivered-utility ratio (0.0286); greedy-edge completed the largest fraction of generated payloads (5.17\%). The single-seed PPO checkpoint completed no tasks, exposing a limitation in current training rather than demonstrating RL inferiority. The simulator's simplified thermal model can exceed its 50$^\circ$C throttle threshold, and results are not flight-validated. Lyapunov, oracle, multi-seed learning, and hardware-calibration studies remain future work.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -50,8 +50,8 @@ For every captured payload, the onboard system must choose among four actions: P
 
 \textbf{Contributions:}
 \begin{itemize}
-    \item We characterize the repository's seeded one-second simulator and implemented multi-threshold heuristic.
-    \item We report five four-orbit heuristic episodes with decision quality, task completion, energy, latency, MMU/RAM utilization, SEU counts, and safe-mode events.
+    \item We implement paired benchmarks for transmit-all, greedy-edge, the threshold heuristic, and an initial MaskablePPO policy.
+    \item We report eight outcome and resource metrics over five four-orbit evaluation seeds, including per-policy uncertainty.
     \item We identify an observed temperature excursion above the code's 50$^\circ$C throttling threshold, a limitation that motivates thermal-model and safety-guard validation.
 \end{itemize}
 
@@ -63,11 +63,11 @@ Orbital edge computing surveys describe the systems-level case for in-space proc
 Resource-constrained orbital scheduling is addressed via two dominant paradigms:
 \begin{enumerate}
     \item \textbf{Lyapunov Optimization \& Drift-Plus-Penalty:} Prior work \cite{neely2010stochastic} motivates online scheduling; implementing and evaluating an orbital scheduler remains planned work.
-    \item \textbf{Constrained Reinforcement Learning (CMDP):} The repository includes a Gymnasium environment; policy training and safety evaluation are not reported here.
+    \item \textbf{Constrained Reinforcement Learning (CMDP):} We train an initial MaskablePPO policy using the repository's Gymnasium environment and invalid-action masks; this one-seed result is exploratory.
 \end{enumerate}
 
 \subsection{Added Value of This Work}
-Prior work motivates orbital edge processing and constrained scheduling. This interim study contributes a reproducible characterization of the current heuristic and identifies model and benchmarking gaps.
+Prior work motivates orbital edge processing and constrained scheduling. This interim study provides a reproducible comparison of two operational reference policies, the threshold heuristic, and one exploratory learned policy, and identifies model and learning gaps.
 
 \section{Methodology}
 
@@ -139,39 +139,42 @@ For each payload $k$, the agent selects an action $a_k \in \mathcal{A}$, where:
                 &\text{DISCARD\_DROP}\}
 \end{align}
 \begin{enumerate}
-    \item \textbf{Baseline Heuristic Policy:} During ground contact it requests one highest-ranked payload per tick, respecting the shared link budget. When $\text{SoC} > 0.50$, $T_{\text{chip}} < 50^\circ\text{C}$, and queue depth $< 2$, it executes inference (for payloads $< 50\text{ MB}$) or compression. Stale payloads ($U_k(t) < 5.0$) are evicted when MMU usage $> 80\%$.
-    \item \textbf{Constrained MDP (Gymnasium):} State $s_t \in \mathbb{R}^{13 + 5K}$ captures normalized telemetry and top-$K$ payload metadata. Invalid action masks zero out physically infeasible actions.
-    \item \textbf{Planned Lyapunov Scheduler:} Drift-plus-penalty scheduling is a Phase~3 target and is not implemented in the current repository.
+    \item \textbf{Transmit-all:} Sends the oldest raw MMU payload during contact, without onboard processing or voluntary drops.
+    \item \textbf{Greedy-edge:} Processes the oldest eligible payload when queue capacity permits, then downlinks processed outputs during contact.
+    \item \textbf{Threshold heuristic:} Uses contact-aware downlink, SoC/temperature-gated processing, and stale-data eviction under storage pressure.
+    \item \textbf{MaskablePPO:} Uses normalized telemetry and top-$K$ payload metadata with invalid-action masks. This initial learned policy is exploratory, not tuned or safety-certified.
+    \item \textbf{Planned methods:} Lyapunov scheduling and a non-causal MILP oracle are not implemented.
 \end{enumerate}
 
 \section{Experiments and Results}
 
 \subsection{Experimental Setup and Results}
-The implemented heuristic was evaluated for five four-orbit episodes (21,600 one-second steps per episode; seeds 42--46), generating 1,440 payloads in each episode. Table~\ref{tab:results} reports means, sample standard deviations, and 95\% Student-$t$ confidence intervals ($n=5$). The evaluator's decision-quality denominator is the snapshot sum of generated payload base values. Memory utilization is time-averaged occupancy; energy includes base, compute, and communication draw; latency averages completed deliveries only.
+Four policies share the same simulator configuration, four-orbit horizon (21,600 one-second steps), and five paired evaluation seeds (1001--1005); the heuristic is the reference. MaskablePPO was trained with seed 7 for 100,000 requested timesteps, with evaluation seeds disjoint from training. Table~\ref{tab:results} reports episode means, sample standard deviations, and two-sided 95\% Student-$t$ intervals ($n=5$). Decision quality divides delivered utility by the snapshot sum of generated payload base values. Memory use is time-averaged occupancy; energy includes modeled base, compute, and communication draw; latency averages completed deliveries only. Since only one PPO training seed was evaluated, its result does not measure training-seed variability.
 
-\begin{table}[htbp]
-\caption{Implemented Heuristic Across Five Four-Orbit Episodes}
+\begin{table*}[t]
+\caption{Paired Policy Comparison Across Five Four-Orbit Episodes (Mean; Sample SD; 95\% CI)}
 \label{tab:results}
 \centering
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lrrr}
+\scriptsize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Metric} & \textbf{Mean} & \textbf{Sample SD} & \textbf{95\% CI} \\
+\textbf{Metric} & \textbf{Transmit-all} & \textbf{Greedy-edge} & \textbf{Heuristic} & \textbf{MaskablePPO (seed 7)} \\
 \midrule
-Decision quality & 0.0283 & 0.0024 & [0.0252, 0.0313] \\
-Completed-task rate & 0.0153 & 0.0010 & [0.0141, 0.0165] \\
-Cumulative energy (kJ) & 291.414 & 1.850 & [289.117, 293.711] \\
-Mean latency (s) & 654.00 & 136.05 & [485.10, 822.89] \\
-MMU utilization (\%) & 37.497 & 2.094 & [34.897, 40.097] \\
-RAM utilization (\%) & 0.172 & 0.002 & [0.169, 0.175] \\
-SEU events / episode & 0.400 & 0.548 & [0.000, 1.080] \\
-Safe-mode events / episode & 0.000 & 0.000 & [0.000, 0.000] \\
+Decision quality & .00183; .00115; [.00040,.00326] & .00470; .00105; [.00339,.00601] & .02860; .00142; [.02683,.03036] & 0; 0; [0,0] \\
+Completed-task rate & .01569; .00212; [.01307,.01832] & .05167; .00805; [.04168,.06166] & .01597; .00049; [.01536,.01658] & 0; 0; [0,0] \\
+Energy (kJ) & 117.150; .340; [116.728,117.571] & 290.882; 1.761; [288.695,293.068] & 290.882; 1.761; [288.695,293.068] & 206.012; 4.782; [200.075,211.949] \\
+Delivery latency (s) & 9658.52;1995.69;[7180.95,12136.10] & 9922.94;1289.76;[8321.74,11524.14] & 753.41;121.36;[602.75,904.07] & N/A (no delivery) \\
+MMU utilization (\%) & 82.81;1.96;[80.39,85.24] & 38.16;1.91;[35.79,40.54] & 37.96;1.90;[35.60,40.32] & 48.77;3.63;[44.27,53.28] \\
+RAM utilization (\%) & 0;0;[0,0] & .173;.003;[.169,.177] & .173;.003;[.169,.177] & .439;.036;[.394,.484] \\
+SEU events / episode & 0;0;[0,0] & 0;0;[0,0] & 0;0;[0,0] & 0;0;[0,0] \\
+Safe-mode events / episode & 0;0;[0,0] & 0;0;[0,0] & 0;0;[0,0] & 0;0;[0,0] \\
 \bottomrule
 \end{tabular}%
 }
-\end{table}
+\end{table*}
 
-The SEU confidence interval is bounded below by zero; five episodes are too few to estimate rare-event rates reliably. Across a separate two-orbit seed-42 trace, SoC ranged from 92.37\% to 100\%, while temperature ranged from 0.75$^\circ$C to 52.48$^\circ$C. The 50$^\circ$C threshold throttles processing but does not bound the simulated temperature.
+The first PPO checkpoint completed no payload in the five held-out episodes. Its lower energy is therefore an inactivity outcome, not a demonstrated energy-efficiency gain; this initial run should motivate reward and training diagnostics. No SEUs occurred in these five evaluation episodes, which is too few to assess rare-event recovery. Across a separate two-orbit seed-42 trace, SoC ranged from 92.37\% to 100\%, while temperature ranged from 0.75$^\circ$C to 52.48$^\circ$C. The 50$^\circ$C threshold throttles processing but does not bound simulated temperature.
 
 \begin{figure}[htbp]
 \centering
@@ -180,13 +183,20 @@ The SEU confidence interval is bounded below by zero; five episodes are too few 
 \label{fig:telemetry}
 \end{figure}
 
-This is a single-policy characterization. The current codebase does not implement the claimed transmit-all comparison, Lyapunov scheduler, or MILP oracle; comparative policy results are future work.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{../../results/figures/policy_comparison.pdf}
+\caption{Policy comparison; bars show means and error bars show 95\% $t$ intervals. PPO completes no tasks in this run.}
+\label{fig:comparison}
+\end{figure}
+
+Greedy-edge's larger completion fraction does not imply higher delivered utility: the utility ratio is lower than for the threshold heuristic. The paired results are preliminary ($n=5$), and the PPO result uses one training seed. Transmit-all and greedy-edge are operational reference policies, not optimized implementations. Lyapunov scheduling and the MILP oracle remain future work.
 
 \subsection{Phase 3 Validation Plan}
-Phase~3 development will: (1) train a MaskablePPO agent in \textit{simulation/rl\_env.py}; (2) integrate the Lyapunov safety filter to bound RL proposals; (3) compute the MILP oracle ceiling; and (4) stress-test under solar flare SEU bursts ($p_{\text{seu}} = 10^{-3}$) and degraded battery packs ($60\text{ Wh}$).
+Next, diagnose sparse-reward learning and improve PPO training using multiple independent training seeds and validation episodes, then evaluate a selected checkpoint on a fresh test set. Further work includes Lyapunov scheduling, a non-causal MILP oracle, and stress tests for SEU bursts, battery degradation, and missed contacts.
 
 \section{Conclusion}
-We report a reproducible five-seed, four-orbit characterization of the implemented heuristic. The measured decision-quality ratio is 0.0283 on the current simulator workload. The two-orbit trace also exposes a thermal-model limitation: simulated temperature can exceed the 50$^\circ$C throttling threshold. Future work includes comparative baselines, a calibrated thermal model with a hard safety guard, and implementation of Lyapunov and oracle schedulers.
+We implemented a paired comparison of transmit-all, greedy-edge, the threshold heuristic, and an initial MaskablePPO policy in one four-orbit simulator benchmark. The heuristic achieved the highest delivered-utility ratio (0.0286), while greedy-edge completed more tasks (5.17\%). The single-seed PPO policy delivered no tasks and needs training/reward redesign before it can support a useful comparison. The simplified thermal model can exceed its throttle threshold; all results are synthetic, not flight-validated. Follow-up work should address these limits and add multiple PPO seeds, Lyapunov scheduling, and an oracle benchmark.
 
 \bibliographystyle{IEEEtran}
 \begin{thebibliography}{00}
