@@ -1,22 +1,16 @@
 # ASTRA: Adaptive Satellite Task and Resource Allocator for LEO Earth Observation
 
-*IASTAM 6.0 Technical Challenge — Track 1: Artificial Intelligence and Onboard Computing (Problem 1)*
-
 **Mohamed Habib Abid¹\*, Mariam Neffeti²\***
 
 ¹ ISI El Manar (Higher Institute of Computer Science), Tunisia
 
 ² INSAT (National Institute of Applied Science and Technology), Tunisia
 
-*Team: Charmoula wMa9rou4*
-
-*Track 1 — Artificial Intelligence and Onboard Computing*
-
-*Problem 1 — “Process or Transmit?”*
-
 *Emails: mohamedhabib.abid@etudiant-isi.utm.tn, mariam.neffeti@insat.ucar.tn*
 
 *(\*Equal contribution)*
+
+*Title footnote: This work was developed for the IEEE IAS Tunisia Annual Meeting (IASTAM 6.0) Technical Challenge in collaboration with the Tunisian Space Association (TUNSA). Team: Charmoula wMa9rou4. Track 1: Artificial Intelligence and Onboard Computing; Problem 1: “Process or Transmit?”.*
 
 ---
 
