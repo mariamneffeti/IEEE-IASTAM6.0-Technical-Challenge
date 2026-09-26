@@ -2,16 +2,26 @@
 
 *IASTAM 6.0 Technical Challenge — Track 1: Artificial Intelligence and Onboard Computing (Problem 1)*
 
-**Mohamed Habib Abid\*, Meriem Neffeti\***
-*Team IASTAM-OrbitEdge — [confirm official team and institution names]*
-*Tunisia*
-*Email: [confirm author email addresses]*
+**Mohamed Habib Abid¹\*, Mariam Neffeti²\***
+
+¹ ISI El Manar (Higher Institute of Computer Science), Tunisia
+
+² INSAT (National Institute of Applied Science and Technology), Tunisia
+
+*Team: Charmoula wMa9rou4*
+
+*Track 1 — Artificial Intelligence and Onboard Computing*
+
+*Problem 1 — “Process or Transmit?”*
+
+*Emails: mohamedhabib.abid@etudiant-isi.utm.tn, mariam.neffeti@insat.ucar.tn*
+
 *(\*Equal contribution)*
 
 ---
 
 ### Abstract
-Small Earth-observation (EO) satellites produce multispectral and synthetic-aperture-radar (SAR) payloads under intermittent ground contact and constrained battery, storage, compute, and thermal resources. We present ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for IASTAM 6.0's "Process or Transmit?" challenge. In the current simulator, we compare transmit-all, greedy-edge processing, a threshold heuristic, and one MaskablePPO policy. We evaluate each over five paired held-out scenarios of four 90-minute orbits, using decision quality, task completion, energy, latency, memory occupancy, single-event-upset (SEU), and safe-mode metrics. The threshold heuristic attains a mean delivered-utility ratio of 0.0286 and task completion rate of 1.60%; greedy-edge completes 5.17% of generated payloads but attains a utility ratio of 0.00470. The single-seed PPO checkpoint delivers no tasks, and its lower energy reflects inactivity. A separate two-orbit trace reaches 52.48 degrees Celsius despite a 50-degree compute-throttling threshold. These synthetic results are preliminary; the thermal threshold is not a hard safety cap, and PPO was trained only briefly. We provide reproducible code and episode-level outputs; Lyapunov and oracle evaluations remain future work.
+Small Earth-observation (EO) satellites produce multispectral and synthetic-aperture-radar (SAR) payloads under intermittent ground contact and constrained battery, storage, compute, and thermal resources. We present ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for IASTAM 6.0's "Process or Transmit?" challenge. In the current simulator, we compare transmit-all, greedy-edge processing, a threshold heuristic, and one MaskablePPO policy. We evaluate each over five paired held-out scenarios of four 90-minute orbits, using decision quality, task completion, energy, latency, memory occupancy, single-event-upset (SEU), and safe-mode metrics. The threshold heuristic attains a mean delivered-utility ratio of 0.0286 and task completion rate of 1.60%; greedy-edge completes 5.17% of generated payloads but attains a utility ratio of 0.00470. The single-seed PPO checkpoint delivers no tasks; its 206.0 kJ mean energy use is below the processing-heavy policies but above transmit-all, consistent with an inactive-but-not-idle policy rather than an efficiency gain. This result is diagnostic rather than a candidate operational policy and motivates the reward and training-time investigation in Section IV-B. A separate two-orbit trace reaches 52.48 degrees Celsius despite a 50-degree compute-throttling threshold. These synthetic results are preliminary; the thermal threshold is not a hard safety cap, and PPO was trained only briefly. We provide reproducible code and episode-level outputs; Lyapunov and oracle evaluations remain future work.
 
 ***Keywords—***orbital edge computing; satellite task scheduling; reinforcement learning; constrained optimization; Low Earth Orbit.
 
@@ -139,7 +149,7 @@ We compare four policies with the same `SimConfig`, simulator, four-orbit horizo
 
 ### B. Preliminary Results
 
-Table II reports all eight metrics from `results/comparison/comparison_summary.csv`; episode values and paired differences from the heuristic are also saved alongside it. Figure 2 plots four principal outcomes. The heuristic has the highest decision-quality ratio and shortest completed-delivery latency. Greedy-edge completes more tasks, but with much lower decision quality and similar energy to the heuristic. PPO completes no tasks; its lower energy therefore reflects inactivity and must not be interpreted as greater efficiency. This initial PPO result indicates a learning/reward-design limitation, not that RL is intrinsically inferior. No Lyapunov or MILP result is claimed.
+Table II reports all eight metrics from `results/comparison/comparison_summary.csv`; episode values and paired differences from the heuristic are also saved alongside it. Figure 2 plots four principal outcomes. The heuristic has the highest decision-quality ratio and shortest completed-delivery latency. Greedy-edge completes more tasks, but with much lower decision quality and the same measured energy as the heuristic on these seeds. PPO completes no tasks; its mean energy use (206.0 kJ) is lower than greedy-edge and the heuristic (290.9 kJ) but higher than transmit-all (117.2 kJ), so this is an inactivity outcome rather than greater efficiency. PPO is included as a diagnostic baseline for reward and training investigation, not as a candidate operational policy. This initial PPO result indicates a learning/reward-design limitation, not that RL is intrinsically inferior. No Lyapunov or MILP result is claimed.
 
 **TABLE II: Paired Policy Comparison, Five Four-Orbit Episodes**
 
@@ -154,6 +164,8 @@ Table II reports all eight metrics from `results/comparison/comparison_summary.c
 | SEU events / episode | 0; 0; [0, 0] | 0; 0; [0, 0] | 0; 0; [0, 0] | 0; 0; [0, 0] |
 | Safe-mode events / episode | 0; 0; [0, 0] | 0; 0; [0, 0] | 0; 0; [0, 0] | 0; 0; [0, 0] |
 
+*Note:* Greedy-edge and the heuristic have identical per-seed energy totals in this run. Direct reruns decompose each total into identical base, compute, and radio energy for each paired seed; their selection and delivery outcomes still differ. This is a workload- and simulator-specific result, not an assumption that the policies generally have equal energy.
+
 A separate seed-42 trajectory over two orbits is plotted in Fig. 1. SoC remained between 92.37% and 100%; chip temperature ranged from 0.75$^\circ$C to 52.48$^\circ$C. The 50$^\circ$C value is a throttling threshold, not a hard upper bound. No SEUs occurred in these five evaluation episodes, which is insufficient evidence about rare-event recovery. With five seeds, paired policy differences remain preliminary.
 
 ![Battery state of charge and simulated chip temperature over two orbits; seed 42. Shading marks sunlight.](../results/figures/orbit_telemetry.svg)
@@ -162,7 +174,7 @@ A separate seed-42 trajectory over two orbits is plotted in Fig. 1. SoC remained
 
 ![Policy comparison with 95% Student-t intervals over five paired four-orbit episodes.](../results/figures/policy_comparison.pdf)
 
-*Fig. 2. Policy comparison. PPO's zero task completion makes its lower energy a non-useful outcome in this configuration.*
+*Fig. 2. Policy comparison. PPO's zero task completion makes its lower energy than the processing-heavy policies a non-useful outcome; its mean energy remains above transmit-all.*
 
 ---
 
@@ -174,7 +186,7 @@ Next, diagnose sparse-reward learning and improve PPO training with multiple ind
 
 ## V. CONCLUSION
 
-We implemented a paired comparison of transmit-all, greedy-edge, the threshold heuristic, and an initial MaskablePPO policy in one four-orbit simulator benchmark. The heuristic achieved the highest delivered-utility ratio (0.0286), while greedy-edge completed more tasks (5.17%). The single-seed PPO policy delivered no tasks and requires training/reward redesign before it can support a useful comparison. The simplified thermal model can exceed its throttle threshold; all results are synthetic, not flight-validated. Follow-up work should address these limits and add multiple PPO seeds, Lyapunov scheduling, and an oracle benchmark.
+We implemented a paired comparison of transmit-all, greedy-edge, the threshold heuristic, and an initial MaskablePPO diagnostic baseline in one four-orbit simulator benchmark. The heuristic achieved the highest delivered-utility ratio (0.0286), while greedy-edge completed more tasks (5.17%). The single-seed PPO policy delivered no tasks; its 206.0 kJ energy use is below the processing-heavy policies but above transmit-all (117.2 kJ), so it is neither evidence of an efficiency gain nor a candidate operational policy. The reproduced equality in greedy-edge and heuristic energy reflects their identical aggregate modeled power draw on these seeds, not identical decisions. The simplified thermal model can exceed its throttle threshold; all results are synthetic, not flight-validated. Follow-up work should address these limits and add multiple PPO seeds, Lyapunov scheduling, and an oracle benchmark.
 
 ---
 
