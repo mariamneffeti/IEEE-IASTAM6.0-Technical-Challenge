@@ -1,12 +1,8 @@
 # ASTRA: Adaptive Satellite Task and Resource Allocator for LEO Earth Observation
 
-**Mohamed Habib Abid¹\*, Mariam Neffeti²\***
-
-¹ ISI El Manar (Higher Institute of Computer Science), Tunisia
-
-² INSAT (National Institute of Applied Science and Technology), Tunisia
-
-*Emails: mohamedhabib.abid@etudiant-isi.utm.tn, mariam.neffeti@insat.ucar.tn*
+| **Mohamed Habib Abid\*** | **Mariam Neffeti†** |
+| --- | --- |
+| ISI El Manar (Higher Institute of Computer Science)<br>Tunisia<br>Email: mohamedhabib.abid@etudiant-isi.utm.tn | INSAT (National Institute of Applied Science and Technology)<br>Tunisia<br>Email: mariam.neffeti@insat.ucar.tn |
 
 *(\*Equal contribution)*
 
