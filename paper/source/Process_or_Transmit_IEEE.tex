@@ -29,11 +29,11 @@ Email: [confirm author email addresses]
 \maketitle
 
 \begin{abstract}
-Small Earth-observation satellites capture multispectral and Synthetic Aperture Radar data under intermittent contact and constrained onboard resources. We introduce ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for the IASTAM 6.0 ``Process or Transmit?'' problem. We compare transmit-all, greedy-edge, a threshold heuristic, and an initial MaskablePPO policy in a seeded one-second-step simulator over five paired four-orbit episodes. The heuristic achieved the largest delivered-utility ratio (0.0286); greedy-edge completed the largest fraction of generated payloads (5.17\%). The single-seed PPO checkpoint completed no tasks, exposing a limitation in current training rather than demonstrating RL inferiority. The simulator's simplified thermal model can exceed its 50$^\circ$C throttle threshold, and results are not flight-validated. Lyapunov, oracle, multi-seed learning, and hardware-calibration studies remain future work.
+Small Earth-observation (EO) satellites produce multispectral and synthetic-aperture-radar (SAR) payloads under intermittent ground contact and constrained battery, storage, compute, and thermal resources. We present ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for IASTAM 6.0's ``Process or Transmit?'' challenge. In the current simulator, we compare transmit-all, greedy-edge processing, a threshold heuristic, and one MaskablePPO policy. We evaluate each over five paired held-out scenarios of four 90-minute orbits, using decision quality, task completion, energy, latency, memory occupancy, single-event-upset (SEU), and safe-mode metrics. The threshold heuristic attains a mean delivered-utility ratio of 0.0286 and task completion rate of 1.60\%; greedy-edge completes 5.17\% of generated payloads but attains a utility ratio of 0.00470. The single-seed PPO checkpoint delivers no tasks, and its lower energy reflects inactivity. A separate two-orbit trace reaches 52.48 degrees Celsius despite a 50-degree compute-throttling threshold. These synthetic results are preliminary; the thermal threshold is not a hard safety cap, and PPO was trained only briefly. We provide reproducible code and episode-level outputs; Lyapunov and oracle evaluations remain future work.
 \end{abstract}
 
 \begin{IEEEkeywords}
-orbital edge computing, onboard task scheduling, energy- and thermal-aware computing, Lyapunov optimization, reinforcement learning, Low Earth Orbit, fault tolerance.
+orbital edge computing, satellite task scheduling, reinforcement learning, constrained optimization, Low Earth Orbit.
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -42,7 +42,7 @@ The 2026 edition of the IEEE IAS Tunisia Annual Meeting (IASTAM 6.0) Technical C
 Within this domain, Problem~1 (``Process or Transmit?'') targets an acute bottleneck in Earth Observation (EO): small satellites continuously capture high-resolution optical and Synthetic Aperture Radar (SAR) payloads (generating multi-megabyte payloads every $15\text{ s}$), yet operate under three binding physical constraints:
 \begin{enumerate}
     \item \textbf{Battery Floor:} The simulator models a $100\text{ Wh}$ battery and clamps its state at a 30\% minimum depth-of-discharge floor.
-    \item \textbf{Thermal Constraint:} Vacuum requires radiative heat rejection. The current simulator uses a first-order thermal proxy and pauses compute at 50$^\circ$C; it does not enforce a hard cap, and the measured trace reaches 52.48$^\circ$C.
+    \item \textbf{Thermal Constraint:} Vacuum requires radiative heat rejection. The current simulator uses a first-order thermal proxy and throttles compute at 50$^\circ$C; this is not a hard cap, and the measured trace reaches 52.48$^\circ$C.
     \item \textbf{Severe Downlink Bandwidth Choke:} Line-of-sight contact with ground stations is limited to short windows ($120\text{--}180\text{ s}$ per 90-minute orbit, about 2.8\% mean contact duty cycle) with an X-band rate of $20.0\text{ Mbps}$ ($2.5\text{ MB/s}$).
 \end{enumerate}
 
@@ -57,7 +57,7 @@ For every captured payload, the onboard system must choose among four actions: P
 
 \section{Related Work}
 \subsection{Orbital and Edge Computing Systems}
-Orbital edge computing surveys describe the systems-level case for in-space processing \cite{denby2020orbital}. Trabant is a recent serverless architecture proposal \cite{pfandzelter2024trabant}; the Tiansuan constellation provides a cloud-native satellite case study \cite{zhang2023satellite}. Broader treatments of Space AI \cite{chen2025spaceai} and Earth-observation image processing \cite{duggan2025advancing} provide context on onboard classification and inference. FPGA accelerator surveys \cite{lentaris2024fpga} and work on when to compute in space \cite{denby2025when} inform the modeled trade-offs; the simulator's numerical parameters remain assumptions rather than transferred empirical measurements.
+Orbital edge computing work describes the potential for processing data near the sensor \cite{denby2020orbital}. Trabant proposes a serverless architecture for multi-tenant orbital computing \cite{pfandzelter2024trabant}, while the Tiansuan BUPT-1 study reports a cloud-native satellite case study \cite{zhang2023satellite}. Broader surveys discuss AI in space \cite{chen2025spaceai} and onboard Earth-observation image processing \cite{duggan2025advancing}. FPGA accelerator research \cite{lentaris2024fpga} and compute-placement analysis \cite{denby2025when} provide context for the design space. The numerical workload, energy, and thermal parameters used here are simulator assumptions; they are not calibrated or copied as empirical operating points from these studies.
 
 \subsection{Control and Scheduling Paradigms}
 Resource-constrained orbital scheduling is addressed via two dominant paradigms:
@@ -86,10 +86,10 @@ The satellite orbital environment and hardware state at time $t$ are formalized 
 $\tau_{\text{orbit}}, \tau_{\text{sun}}$ & Orbit period / Sunlit duration & $5400\text{ s}$ / $3300\text{ s}$ (90 / 55 min) \\
 $P_{\text{harvest}}(t)$ & Solar power harvested & $0.0\text{ W}$ (ecl) to $30.0\text{ W}$ peak \\
 $\text{SoC}(t)$ & Battery State-of-Charge & Floor $\ge 0.30$, Cap: $100.0\text{ Wh}$ \\
-$T_{\text{chip}}(t)$ & Processor temperature & Ambient $0^\circ\text{C}$, Ceiling $\le 50.0^\circ\text{C}$ \\
+$T_{\text{chip}}$ & Processor temperature & Ambient $0^\circ\text{C}$, throttle threshold $50.0^\circ\text{C}$ (not a hard cap) \\
 $G(t)$ & Ground station contact flag & $\{0, 1\}$, $120\text{--}180\text{ s}$ pass (about 2.8\% mean duty) \\
 $B_{\text{downlink}}$ & RF communication speed & $20.0\text{ Mbps} = 2.5\text{ MB/s}$ ($15.0\text{ W}$) \\
-$p_{\text{seu}}$ & SEU bit-flip rate & $10^{-5}\text{ s}^{-1}$ cosmic radiation \\
+$p_{\text{seu}}$ & Simulated per-second SEU-proxy probability & $10^{-5}$ RAM-reset event probability \\
 $M_{\text{mmu}}, M_{\text{ram}}$ & Mass Memory / RAM & $32\,000\text{ MB}$ / $4\,000\text{ MB}$ \\
 \bottomrule
 \end{tabular}%
@@ -200,14 +200,14 @@ We implemented a paired comparison of transmit-all, greedy-edge, the threshold h
 
 \bibliographystyle{IEEEtran}
 \begin{thebibliography}{00}
-\bibitem{denby2020orbital} B. Denby and B. Lucia, ``Orbital Edge Computing: Machine Inference in Space,'' \textit{IEEE Micro}, vol. 40, no. 1, pp. 7--15, Jan.--Feb. 2020.
+\bibitem{denby2020orbital} B. Denby and B. Lucia, ``Orbital Edge Computing: Machine Inference in Space,'' \textit{IEEE Computer Architecture Letters}, vol. 18, no. 1, pp. 59--62, Jan.--Jun. 2019, doi: 10.1109/LCA.2019.2907539.
 \bibitem{pfandzelter2024trabant} T. Pfandzelter, N. Bauer, A. Leis, C. Perdrizet, F. Trautwein, T. Schirmer, O. Abboud, and D. Bermbach, ``Trabant: A Serverless Architecture for Multi-Tenant Orbital Edge Computing,'' arXiv:2504.08337, 2025.
 \bibitem{zhang2023satellite} C. Wang, Y. Zhang, Q. Li, A. Zhou, and S. Wang, ``Satellite Computing: A Case Study of Cloud-Native Satellites,'' arXiv:2307.08530, 2023.
 \bibitem{chen2025spaceai} Z. Wang, ``Space AI: Leveraging Artificial Intelligence for Space to Improve Life on Earth,'' \textit{arXiv:2512.22399}, 2025.
 \bibitem{duggan2025advancing} A. Duggan, B. Andrade, and H. Afli, ``Advancing Earth Observation: A Survey on AI-Powered Image Processing in Satellites,'' arXiv:2501.12030, 2025.
-\bibitem{lentaris2024fpga} P. Antunes and A. Podobas, ``FPGA-Based Neural Network Accelerators for Space Applications: A Survey, arXiv:2504.16173, 2025 (version 3, June 2026).
+\bibitem{lentaris2024fpga} P. Antunes and A. Podobas, ``FPGA-Based Neural Network Accelerators for Space Applications: A Survey,'' arXiv:2504.16173, 2025.
 \bibitem{denby2025when} R. Thummala and G. Falco, ``When to Compute in Space,'' \textit{arXiv:2512.17054}, 2025.
-\bibitem{suncatcher2025} B. Agüera y Arcas et al., ``Towards a Future Space-Based, Highly Scalable AI Infrastructure System Design (Project Suncatcher),'' \textit{arXiv:2511.19468}, 2025.
+\bibitem{suncatcher2025} B. Agüera y Arcas et al., ``Towards a Future Space-Based, Highly Scalable AI Infrastructure System Design,'' arXiv:2511.19468, 2025.
 \bibitem{iastam2026spec} IEEE Industry Applications Society, ``IASTAM 6.0 Technical Challenge Specification Book: Track 1 AI \& Onboard Computing,'' IEEE IAS Tunisia Annual Meeting, 2026.
 \bibitem{neely2010stochastic} M. J. Neely, \textit{Stochastic Network Optimization with Application to Communication and Queueing Systems}, Morgan \& Claypool Publishers, 2010.
 \end{thebibliography}

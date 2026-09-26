@@ -2,18 +2,18 @@
 
 *IASTAM 6.0 Technical Challenge — Track 1: Artificial Intelligence and Onboard Computing (Problem 1)*
 
-**Mohamed Habib Abid\*, Meriem Neffeti\***  
-*Team IASTAM-OrbitEdge — [confirm official team and institution names]*  
-*Tunisia*  
-*Email: [confirm author email addresses]*  
+**Mohamed Habib Abid\*, Meriem Neffeti\***
+*Team IASTAM-OrbitEdge — [confirm official team and institution names]*
+*Tunisia*
+*Email: [confirm author email addresses]*
 *(\*Equal contribution)*
 
 ---
 
 ### Abstract
-Small Earth-observation satellites capture multispectral and Synthetic Aperture Radar data under intermittent contact and constrained onboard resources. We introduce ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for the IASTAM 6.0 "Process or Transmit?" problem. We compare transmit-all, greedy-edge, a threshold heuristic, and an initial MaskablePPO policy over five paired four-orbit episodes in a seeded one-second simulator. The heuristic achieved the highest delivered-utility ratio (0.0286); greedy-edge completed the greatest share of payloads (5.17%). The single-seed PPO checkpoint completed no tasks, exposing a limitation in current training rather than demonstrating RL inferiority. The simplified thermal model can exceed its 50$^\circ$C throttle threshold, and results are not flight-validated. Lyapunov, oracle, multi-seed learning, and hardware-calibration studies remain future work.
+Small Earth-observation (EO) satellites produce multispectral and synthetic-aperture-radar (SAR) payloads under intermittent ground contact and constrained battery, storage, compute, and thermal resources. We present ASTRA (Adaptive Satellite Task and Resource Allocator), a research prototype for IASTAM 6.0's "Process or Transmit?" challenge. In the current simulator, we compare transmit-all, greedy-edge processing, a threshold heuristic, and one MaskablePPO policy. We evaluate each over five paired held-out scenarios of four 90-minute orbits, using decision quality, task completion, energy, latency, memory occupancy, single-event-upset (SEU), and safe-mode metrics. The threshold heuristic attains a mean delivered-utility ratio of 0.0286 and task completion rate of 1.60%; greedy-edge completes 5.17% of generated payloads but attains a utility ratio of 0.00470. The single-seed PPO checkpoint delivers no tasks, and its lower energy reflects inactivity. A separate two-orbit trace reaches 52.48 degrees Celsius despite a 50-degree compute-throttling threshold. These synthetic results are preliminary; the thermal threshold is not a hard safety cap, and PPO was trained only briefly. We provide reproducible code and episode-level outputs; Lyapunov and oracle evaluations remain future work.
 
-***Keywords—***orbital edge computing; onboard task scheduling; energy- and thermal-aware computing; Lyapunov optimization; reinforcement learning; Low Earth Orbit; fault tolerance.
+***Keywords—***orbital edge computing; satellite task scheduling; reinforcement learning; constrained optimization; Low Earth Orbit.
 
 ---
 
@@ -23,7 +23,7 @@ The IASTAM 6.0 Technical Challenge, organized by IEEE IAS Tunisia with TUNSA, as
 
 Within this domain, Problem 1 ("Process or Transmit?") targets an acute bottleneck in Earth Observation (EO): small satellites continuously capture high-resolution optical and Synthetic Aperture Radar (SAR) payloads (generating multi-megabyte payloads every $15\text{ s}$), yet operate under three binding physical constraints:
 1. **Electrochemical Battery Degradation Floor:** The current simulator models a $100\text{ Wh}$ battery with a 30% minimum depth-of-discharge floor.
-2. **Thermal Constraint:** The physical system requires radiative heat rejection in vacuum. The current simulator uses a first-order thermal proxy and pauses compute at 50$^\circ$C; it does not enforce a hard temperature limit, as the measured trajectory reaches 52.48$^\circ$C.
+2. **Thermal Constraint:** The physical system requires radiative heat rejection in vacuum. The current simulator uses a first-order thermal proxy and throttles compute at 50$^\circ$C, but this is not a hard temperature limit; a measured trajectory reaches 52.48$^\circ$C.
 3. **Severe Downlink Bandwidth Choke:** Line-of-sight contact with ground stations is limited to short windows ($120\text{--}180\text{ s}$ per 90-minute orbit, about 2.8% mean contact duty cycle) with an X-band rate of $20.0\text{ Mbps}$ ($2.5\text{ MB/s}$).
 
 For every captured payload, the onboard system must choose among four actions: `PROCESS_NOW` (compression vs. inference), `STORE_QUEUE` (time-shifted execution in Mass Memory Unit, MMU), `TRANSMIT_RAW` (downlink during line-of-sight passes), or `DISCARD_DROP` (pruning low-utility or cloud-occluded data). The optimization objective is to maximize cumulative scientific and operational utility, which decays exponentially over latency.
@@ -39,11 +39,11 @@ For every captured payload, the onboard system must choose among four actions: `
 ## II. RELATED WORK
 
 ### A. Orbital and Edge Computing Systems
-Surveys of orbital edge computing delineate the compelling systems-level case for in-space processing: edge inference on commercial off-the-shelf (COTS) and radiation-tolerant hardware substantially mitigates downlink choke [1]. Serverless and cloud-native architectures for multi-tenant orbital platforms, such as Trabant [2] and studies on the Tiansuan constellation [3], demonstrate that containerized workloads can be time-shifted across orbital resource cycles. Broader treatments of Space AI [4] underscore the necessity of autonomous onboard classification, while Earth observation surveys [5] catalog compression and neural inference tradeoffs. Furthermore, space-grade FPGA neural accelerator benchmarks [6] and analytical studies on when to compute in space [7] establish the empirical energy-latency operating points adopted in our modeling.
+Orbital edge computing work describes the potential for processing data near the sensor [1]. Trabant proposes a serverless architecture for multi-tenant orbital computing [2], while the Tiansuan BUPT-1 study reports a cloud-native satellite case study [3]. Broader surveys discuss AI in space [4] and onboard Earth-observation image processing [5]. FPGA accelerator research [6] and compute-placement analysis [7] provide context for the design space. The numerical workload, energy, and thermal parameters used here are simulator assumptions; they are not calibrated or copied as empirical operating points from these studies.
 
 ### B. Control and Scheduling Paradigms
 Resource-constrained orbital scheduling is addressed via two dominant paradigms:
-1. **Lyapunov Optimization & Drift-Plus-Penalty:** Prior work [11] motivates an online scheduling approach; implementing and evaluating an orbital scheduler remains planned work.
+1. **Lyapunov Optimization & Drift-Plus-Penalty:** Prior work [10] motivates an online scheduling approach; implementing and evaluating an orbital scheduler remains planned work.
 2. **Constrained Reinforcement Learning (CMDP):** We train an initial MaskablePPO policy with the repository's Gymnasium environment and invalid-action masks; its single-seed result is exploratory.
 
 ### C. Added Value of This Work
@@ -180,13 +180,13 @@ We implemented a paired comparison of transmit-all, greedy-edge, the threshold h
 
 ## REFERENCES
 
-[1] B. Denby and B. Lucia, "Orbital Edge Computing: Machine Inference in Space," *IEEE Micro*, vol. 40, no. 1, pp. 7–15, Jan.–Feb. 2020.  
+[1] B. Denby and B. Lucia, "Orbital Edge Computing: Machine Inference in Space," *IEEE Computer Architecture Letters*, vol. 18, no. 1, pp. 59–62, Jan.–Jun. 2019, doi: 10.1109/LCA.2019.2907539.
 [2] T. Pfandzelter, N. Bauer, A. Leis, C. Perdrizet, F. Trautwein, T. Schirmer, O. Abboud, and D. Bermbach, "Trabant: A Serverless Architecture for Multi-Tenant Orbital Edge Computing," arXiv:2504.08337, 2025.
 [3] C. Wang, Y. Zhang, Q. Li, A. Zhou, and S. Wang, "Satellite Computing: A Case Study of Cloud-Native Satellites," arXiv:2307.08530, 2023.
-[4] Z. Wang, "Space AI: Leveraging Artificial Intelligence for Space to Improve Life on Earth," *arXiv preprint arXiv:2512.22399*, 2025.  
+[4] Z. Wang, "Space AI: Leveraging Artificial Intelligence for Space to Improve Life on Earth," *arXiv preprint arXiv:2512.22399*, 2025.
 [5] A. Duggan, B. Andrade, and H. Afli, "Advancing Earth Observation: A Survey on AI-Powered Image Processing in Satellites," arXiv:2501.12030, 2025.
-[6] P. Antunes and A. Podobas, "FPGA-Based Neural Network Accelerators for Space Applications: A Survey," arXiv:2504.16173, 2025 (version 3, June 2026).  
-[7] R. Thummala and G. Falco, "When to Compute in Space," *arXiv preprint arXiv:2512.17054*, 2025.  
-[8] B. Agüera y Arcas et al., "Towards a Future Space-Based, Highly Scalable AI Infrastructure System Design (Project Suncatcher)," *arXiv preprint arXiv:2511.19468*, 2025.  
-[9] IEEE Industry Applications Society, "IASTAM 6.0 Technical Challenge Specification Book: Track 1 AI & Onboard Computing," IEEE IAS Tunisia Annual Meeting, 2026.  
-[11] M. J. Neely, *Stochastic Network Optimization with Application to Communication and Queueing Systems*, Synthesis Lectures on Communication Networks, Morgan & Claypool Publishers, 2010.
+[6] P. Antunes and A. Podobas, "FPGA-Based Neural Network Accelerators for Space Applications: A Survey," arXiv:2504.16173, 2025.
+[7] R. Thummala and G. Falco, "When to Compute in Space," *arXiv preprint arXiv:2512.17054*, 2025.
+[8] B. Agüera y Arcas et al., "Towards a Future Space-Based, Highly Scalable AI Infrastructure System Design," arXiv:2511.19468, 2025.
+[9] IEEE Industry Applications Society, "IASTAM 6.0 Technical Challenge Specification Book: Track 1 AI & Onboard Computing," IEEE IAS Tunisia Annual Meeting, 2026.
+[10] M. J. Neely, *Stochastic Network Optimization with Application to Communication and Queueing Systems*, Synthesis Lectures on Communication Networks, Morgan & Claypool Publishers, 2010.
