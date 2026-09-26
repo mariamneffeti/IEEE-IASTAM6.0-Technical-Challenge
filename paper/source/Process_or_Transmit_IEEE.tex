@@ -151,10 +151,7 @@ For each payload $k$, the agent selects an action $a_k \in \mathcal{A}$, where:
 
 \section{Experiments and Results}
 
-\subsection{Experimental Setup}
-Four policies share the same simulator configuration, four-orbit horizon (21,600 one-second steps), and five paired evaluation seeds (1001--1005); the heuristic is the reference. MaskablePPO was trained with seed 7 for 100,000 requested timesteps, with evaluation seeds disjoint from training. Table~\ref{tab:results} reports episode means, sample standard deviations, and two-sided 95\% Student-$t$ intervals ($n=5$). Decision quality divides delivered utility by the snapshot sum of generated payload base values. Memory use is time-averaged occupancy; energy includes modeled base, compute, and communication draw; latency averages completed deliveries only. Since only one PPO training seed was evaluated, its result does not measure training-seed variability. PPO is included as a diagnostic baseline for reward and training investigation, not as a candidate operational policy.
-
-\begin{table*}[t]
+\begin{table*}[!t]
 \caption{Paired Policy Comparison Across Five Four-Orbit Episodes (Mean; Sample SD; 95\% CI)}
 \label{tab:results}
 \centering
@@ -177,6 +174,12 @@ Safe-mode events / episode & 0;0;[0,0] & 0;0;[0,0] & 0;0;[0,0] & 0;0;[0,0] \\
 }
 \par\smallskip\noindent\footnotesize\textit{Note:} Greedy-edge and the heuristic have identical per-seed energy totals in this run. Direct reruns confirm equal aggregate base, compute, and radio draw for each paired seed; the equality is specific to this workload and simulator run.\normalsize
 \end{table*}
+
+
+\subsection{Experimental Setup}
+Four policies share the same simulator configuration, four-orbit horizon (21,600 one-second steps), and five paired evaluation seeds (1001--1005); the heuristic is the reference. MaskablePPO was trained with seed 7 for 100,000 requested timesteps, with evaluation seeds disjoint from training. Table~\ref{tab:results} reports episode means, sample standard deviations, and two-sided 95\% Student-$t$ intervals ($n=5$). Decision quality divides delivered utility by the snapshot sum of generated payload base values. Memory use is time-averaged occupancy; energy includes modeled base, compute, and communication draw; latency averages completed deliveries only. Since only one PPO training seed was evaluated, its result does not measure training-seed variability. PPO is included as a diagnostic baseline for reward and training investigation, not as a candidate operational policy.
+
+
 
 \subsection{Preliminary Results}
 
@@ -203,6 +206,7 @@ Next, diagnose sparse-reward learning and improve PPO training using multiple in
 \section{Conclusion}
 We implemented a paired comparison of transmit-all, greedy-edge, the threshold heuristic, and an initial MaskablePPO diagnostic baseline in one four-orbit simulator benchmark. The heuristic achieved the highest delivered-utility ratio (0.0286), while greedy-edge completed more tasks (5.17\%). The single-seed PPO policy delivered no tasks; its 206.0 kJ energy use is below the processing-heavy policies but above transmit-all (117.2 kJ), so it is neither evidence of an efficiency gain nor a candidate operational policy. The reproduced equality in greedy-edge and heuristic energy reflects their identical aggregate modeled power draw on these seeds, not identical decisions. The simplified thermal model can exceed its throttle threshold; all results are synthetic, not flight-validated. Follow-up work should address these limits and add multiple PPO seeds, Lyapunov scheduling, and an oracle benchmark.
 
+\vspace{6pt}
 \bibliographystyle{IEEEtran}
 \begin{thebibliography}{00}
 \bibitem{denby2020orbital} B. Denby and B. Lucia, ``Orbital Edge Computing: Machine Inference in Space,'' \textit{IEEE Computer Architecture Letters}, vol. 18, no. 1, pp. 59--62, Jan.--Jun. 2019, doi: 10.1109/LCA.2019.2907539.

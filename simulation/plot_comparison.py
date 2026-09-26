@@ -52,9 +52,11 @@ def main():
                  for policy in policies]
         errors = [[mean - low for mean, low in zip(means, lows)],
                   [high - mean for mean, high in zip(means, highs)]]
-        axis.bar([labels[p] for p in policies], means, color="#277da1", alpha=0.86)
-        axis.errorbar(policies, means, yerr=errors, fmt="none", ecolor="#222",
+        positions = list(range(len(policies)))
+        axis.bar(positions, means, color="#277da1", alpha=0.86)
+        axis.errorbar(positions, means, yerr=errors, fmt="none", ecolor="#222",
                       capsize=4, linewidth=1)
+        axis.set_xticks(positions, [labels[p] for p in policies])
         axis.set_title(title)
         axis.tick_params(axis="x", labelrotation=20)
         axis.grid(axis="y", alpha=0.25)
