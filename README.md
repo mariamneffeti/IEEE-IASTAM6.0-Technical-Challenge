@@ -38,12 +38,12 @@ Use Python 3.10+:
 
 Training seed 7 is separate from the held-out evaluation seeds 1001–1005:
 
-    python -m simulation.train_rl --timesteps 100000 --seed 7 --output results/models/astra_ppo_seed7
+    python -m simulation.train_rl --timesteps 750000 --seed 7 --output results/models/astra_ppo_seed7
     python -m simulation.compare --policies transmit_all greedy_edge heuristic --rl-model results/models/astra_ppo_seed7.zip --episodes 5 --seed 1001 --orbits 4 --output-dir results/comparison
     python -m simulation.plot_comparison
     python -m simulation.plot_trajectory
 
-The benchmark outputs per-episode metrics, mean/standard deviation/95% confidence intervals, and paired differences from the heuristic. Read the [comparison protocol](docs/research/policy_comparison_protocol.md) before interpreting the exploratory PPO result.
+The PPO training horizon is 750,000 steps with `gamma=0.999`; the reward includes a small shaping term for accepted processing actions because scientific utility may only be realized at a later ground-station pass. The benchmark outputs per-episode metrics, mean/standard deviation/95% confidence intervals, and paired differences from the heuristic. Read the [comparison protocol](docs/research/policy_comparison_protocol.md) before interpreting the PPO result.
 
 ## Verification
 

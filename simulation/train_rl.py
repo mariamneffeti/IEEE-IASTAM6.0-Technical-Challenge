@@ -20,6 +20,7 @@ def train(total_timesteps: int, seed: int, output_path: str) -> Path:
         ) from exc
 
     torch.manual_seed(seed)
+    torch.set_num_threads(1)
     env = SatelliteEnv(max_orbits=4)
     model = MaskablePPO(
         "MlpPolicy",
@@ -27,9 +28,11 @@ def train(total_timesteps: int, seed: int, output_path: str) -> Path:
         seed=seed,
         verbose=1,
         device="auto",
-        n_steps=2048,
+        n_steps=4096,
         batch_size=256,
-        gamma=0.99,
+        # Payload utility may not arrive until processing and a later ground pass.
+        gamma=0.999,
+        n_epochs=5,
         ent_coef=0.01,
     )
     model.learn(total_timesteps=total_timesteps)
@@ -46,6 +49,9 @@ def train(total_timesteps: int, seed: int, output_path: str) -> Path:
         "training_timesteps": model.num_timesteps,
         "training_orbits_per_episode": 4,
         "evaluation_seeds_must_be_disjoint": True,
+        "reward_shaping": {"accepted_process_value_fraction": 0.02},
+        "ppo": {"n_steps": 4096, "batch_size": 256,
+                "gamma": 0.999, "n_epochs": 5},
         "sim_config": asdict(SimConfig()),
         "torch_version": torch.__version__,
         "gymnasium_version": gymnasium.__version__,
@@ -60,7 +66,7 @@ def train(total_timesteps: int, seed: int, output_path: str) -> Path:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--timesteps", type=int, default=100_000)
+    parser.add_argument("--timesteps", type=int, default=750_000)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--output", default="results/models/astra_ppo_seed7")
     args = parser.parse_args()

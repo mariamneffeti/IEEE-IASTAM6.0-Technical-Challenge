@@ -11,9 +11,13 @@ class SatelliteEnv(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, cfg: SimConfig = None, max_orbits: int = 3, top_k_payloads: int = 5):
+    def __init__(self, cfg: SimConfig = None, max_orbits: int = 3,
+                 top_k_payloads: int = 5, reward_config: dict = None):
         super().__init__()
         self.cfg = cfg or SimConfig()
+        self.reward_config = {"accepted_process_value_fraction": 0.02}
+        if reward_config:
+            self.reward_config.update(reward_config)
         self.max_steps = self.cfg.orbit_period_s * max_orbits
         self.top_k = top_k_payloads
         
@@ -45,7 +49,7 @@ class SatelliteEnv(gym.Env):
         self.step_count = 0
         self.previous_utility = 0.0
         
-        return self._get_obs(), {}
+        return self._get_obs(), {"episode_seed": episode_seed}
 
     def _get_obs(self) -> np.ndarray:
         tel = self.sat.get_telemetry()
@@ -186,6 +190,15 @@ class SatelliteEnv(gym.Env):
         invol_drops_before = tel_before["involuntary_drops"]
         was_safe_mode = tel_before["in_safe_mode"]
 
+        process_value = {
+            action["payload_id"]: next(
+                (p.current_value(self.sat.env.time_step)
+                 for p in sorted_payloads if p.id == action["payload_id"]),
+                0.0,
+            )
+            for action in sim_actions if action["type"] == "process"
+        }
+
         # Step simulation
         feedback = self.sat.step(sim_actions)
         
@@ -208,6 +221,17 @@ class SatelliteEnv(gym.Env):
         # Penalties scaled to match utility magnitudes
         reward -= (new_vol_drops * 25.0)
         reward -= (new_invol_drops * 50.0)
+
+        # Utility is realized at downlink, which can be many minutes after an
+        # accepted process action. This small shaping reward gives PPO a
+        # near-term signal while leaving the scientific score tied to delivery.
+        accepted_processes = {
+            item.get("payload_id") for item in feedback
+            if item.get("type") == "ok" and item.get("action") == "process"
+        }
+        reward += self.reward_config["accepted_process_value_fraction"] * sum(
+            process_value[payload_id] for payload_id in accepted_processes
+        )
         
         if just_entered_safe_mode:
             reward -= 500.0
