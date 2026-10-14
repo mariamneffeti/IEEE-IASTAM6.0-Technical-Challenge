@@ -6,10 +6,10 @@
 
 **Team:** Charmoula wMa9rou4
 
-**Authors:** Mohamed Habib Abid*; Mariam Neffeti†
+**Authors:** Mohamed Habib Abid; Mariam Neffeti
 
 **Affiliations:** ISI El Manar and INSAT, Tunisia
-**Report status:** Assessment report based on the repository snapshot dated 13 October 2026
+**Report status:** Assessment report based on the repository snapshot dated 14 October 2026
 
 ---
 
@@ -165,7 +165,7 @@ Table 1 reports the checked-in benchmark means, sample standard deviations, and 
 | Energy | 117.15; 0.34; [116.73, 117.57] kJ | 290.88; 1.76; [288.70, 293.07] kJ | 290.88; 1.76; [288.70, 293.07] kJ | 206.01; 4.78; [200.07, 211.95] kJ |
 | Completed-delivery latency | 9,659; 1,996; [7,181, 12,136] s | 9,923; 1,290; [8,322, 11,524] s | **753; 121; [603, 904] s** | N/A: no deliveries |
 | Mean MMU utilization | 82.81%; 1.96%; [80.39%, 85.24%] | 38.16%; 1.91%; [35.79%, 40.54%] | 37.96%; 1.90%; [35.60%, 40.32%] | 48.77%; 3.63%; [44.27%, 53.28%] |
-| Mean RAM utilization | 0 | 0.173%; 0.003%; [0.169%, 0.177%] | 0.173%; 0.003%; [0.169%, 0.177%] | 0.439%; 0.036%; [0.394%, 0.484%] |
+| Mean RAM utilization | 0; 0; [0, 0] | 0.173%; 0.003%; [0.169%, 0.177%] | 0.173%; 0.003%; [0.169%, 0.177%] | 0.439%; 0.036%; [0.394%, 0.484%] |
 | SEU events per episode | 0 | 0 | 0 | 0 |
 | Safe-mode events per episode | 0 | 0 | 0 | 0 |
 
